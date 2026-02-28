@@ -39,14 +39,27 @@ jobs:
         run: curl -fsS "http://localhost:18080/toggle?healthy=false"
 
       - name: Wait for incident opening
-        run: sleep 20
+        run: |
+          for i in {1..30}; do
+            count="$(
+              docker exec $(docker ps -qf name=postgres) \
+                psql -U dozor -d dozor -t -A \
+                -c "SELECT COUNT(*) FROM incidents WHERE status = 0;" \
+                | tr -d '[:space:]'
+            )"
+            if [ "${count}" != "0" ] && [ -n "${count}" ]; then
+              echo "Open incidents: ${count}"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Open incident was not created in time"
+          exit 1
 
       - name: Assert open incident exists
         run: |
           docker exec $(docker ps -qf name=postgres) \
-            psql -U dozor -d dozor -t -A \
-            -c "SELECT COUNT(*) FROM incidents WHERE status = 0;" | tee /tmp/open_incidents.txt
-          test "$(cat /tmp/open_incidents.txt)" != "0"
+            psql -U dozor -d dozor -c "SELECT id, root_component_id, started_at, status FROM incidents WHERE status = 0 ORDER BY started_at DESC;"
 
       - name: Show state snapshot
         if: always()
