@@ -27,6 +27,7 @@ dozor/
       ├── engine/       # Evaluation loop orchestration
       ├── persistence/  # Postgres repositories
       ├── cache/        # Redis temporal buckets
+      ├── health/       # Pull-based health checks as signal producers
       ├── scheduler/    # Periodic evaluation ticks
       └── bootstrap/    # Application wiring
 ```
@@ -36,6 +37,7 @@ Layer responsibilities:
 - `domain` contains business concepts and must stay framework-agnostic.
 - `state`, `propagation`, `incident`, and `alert` implement deterministic core logic.
 - `persistence`, `cache`, and `config` are adapters.
+- `health` is an adapter that produces signals and does not mutate state directly.
 - `api`, `scheduler`, and `bootstrap` are runtime entrypoints and wiring.
 
 ## 3. Execution Model

@@ -1,0 +1,56 @@
+evaluation:
+  window: 5m
+  recovery_window: 2m
+  incident_threshold: 2m
+  debounce: 250ms
+
+runtime:
+  queue_capacity: 1024
+
+api:
+  host: 0.0.0.0
+  port: 8080
+
+postgres:
+  jdbc_url: jdbc:postgresql://postgres:5432/dozor
+  username: dozor
+  password: dozor
+
+redis:
+  enabled: true
+  uri: redis://redis:6379
+
+telegram:
+  enabled: false
+  bot_token: ""
+  chat_id: ""
+
+components:
+  - name: database
+  - name: api
+  - name: worker
+
+dependencies:
+  - upstream: database
+    downstream: api
+  - upstream: api
+    downstream: worker
+
+thresholds:
+  database:
+    critical: 3
+    degraded: 3
+  api:
+    critical: 3
+    degraded: 3
+  worker:
+    critical: 3
+    degraded: 3
+
+checks:
+  - component: database
+    type: http
+    url: http://mock-health:18080/health
+    interval: 5s
+    timeout: 2s
+    failure_threshold: 3

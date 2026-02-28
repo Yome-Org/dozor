@@ -1,5 +1,7 @@
 # Dozor
 
+[![CI](https://github.com/Yome-Org/dozor/actions/workflows/ci.yml/badge.svg)](https://github.com/Yome-Org/dozor/actions/workflows/ci.yml)
+
 Dozor is a deterministic, state-centric system health evaluation engine.
 
 It is designed to:
@@ -119,6 +121,113 @@ v0.1 uses static YAML configuration:
 - temporal windows
 
 Runtime mutation is intentionally not supported in v1.
+
+Environment overrides are also supported through a local `.env` file or process environment.
+
+Supported variables:
+
+- `API_HOST`
+- `API_PORT`
+- `POSTGRES_DB`
+- `POSTGRES_JDBC_URL`
+- `POSTGRES_USERNAME`
+- `POSTGRES_PASSWORD`
+- `POSTGRES_PORT`
+- `REDIS_ENABLED`
+- `REDIS_URI`
+- `REDIS_PORT`
+- `MOCK_HEALTH_PORT`
+- `TELEGRAM_ENABLED`
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+## Signal Ingestion API
+
+Dozor exposes a minimal ingestion contract:
+
+`POST /signal`
+
+```json
+{
+  "component": "database",
+  "severity": "CRITICAL",
+  "source": "health-check",
+  "occurredAt": "2025-01-01T12:00:00Z"
+}
+```
+
+Response behavior:
+
+- `202` accepted and queued for evaluation
+- `200` duplicate signal (idempotent no-op)
+- `400` validation error
+- `404` unknown component
+- `429` backpressure (queue full)
+
+See `docs/signal-ingestion-contract.md`.
+
+Dozor also supports pull-based health checks as an additional signal source.
+See `docs/health-check-model.md`.
+
+## Local Compose Setup
+
+For a full local vertical slice with `dozor`, `postgres`, `redis`, and a mock health service:
+
+```bash
+cp .env.example .env
+docker compose --env-file .env -f docker/compose.yaml up --build
+```
+
+Or via `Makefile`:
+
+```bash
+make env-init
+make compose-up
+```
+
+`.env` is the single source of local environment configuration for:
+
+- Dozor runtime
+- Postgres container
+- Redis container
+- exposed local ports
+- Telegram delivery
+
+See `docs/local-compose-setup.md`.
+
+## Code Style
+
+Formatting is enforced with `spotless` and `ktfmt`.
+
+Useful commands:
+
+```bash
+make fmt
+make fmt-check
+```
+
+## Telegram Setup
+
+To receive alerts in Telegram:
+
+1. Open Telegram and start a chat with `@BotFather`.
+2. Run `/newbot`.
+3. Choose a bot name and a unique bot username.
+4. Copy the bot token returned by BotFather.
+5. Start a chat with your new bot and send any message.
+6. Open:
+   `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getUpdates`
+7. Find the `chat` object in the response and copy `id`.
+
+Configure `.env`:
+
+```env
+TELEGRAM_ENABLED=true
+TELEGRAM_BOT_TOKEN=<your_bot_token>
+TELEGRAM_CHAT_ID=<your_chat_id>
+```
+
+Then restart Dozor.
 
 ## Non-Goals (v0.1)
 

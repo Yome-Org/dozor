@@ -1,0 +1,71 @@
+name: Smoke Compose
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Start stack
+        run: docker compose --env-file .env -f docker/compose.yaml up --build -d
+
+      - name: Wait for Dozor API
+        run: |
+          for i in {1..60}; do
+            if bash -c '</dev/tcp/127.0.0.1/8080' 2>/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Dozor API did not start in time"
+          exit 1
+
+      - name: Trigger failure
+        run: curl -fsS "http://localhost:18080/toggle?healthy=false"
+
+      - name: Wait for incident opening
+        run: sleep 20
+
+      - name: Assert open incident exists
+        run: |
+          docker exec $(docker ps -qf name=postgres) \
+            psql -U dozor -d dozor -t -A \
+            -c "SELECT COUNT(*) FROM incidents WHERE status = 0;" | tee /tmp/open_incidents.txt
+          test "$(cat /tmp/open_incidents.txt)" != "0"
+
+      - name: Show state snapshot
+        if: always()
+        run: |
+          docker exec $(docker ps -qf name=postgres) \
+            psql -U dozor -d dozor \
+            -c "SELECT component_id, state, last_evaluated_at, version FROM component_state ORDER BY last_evaluated_at DESC;"
+
+      - name: Show incidents snapshot
+        if: always()
+        run: |
+          docker exec $(docker ps -qf name=postgres) \
+            psql -U dozor -d dozor \
+            -c "SELECT id, root_component_id, started_at, resolved_at, status FROM incidents ORDER BY started_at DESC LIMIT 20;"
+
+      - name: Show service logs
+        if: always()
+        run: docker compose --env-file .env -f docker/compose.yaml logs dozor postgres redis mock-health
+
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file .env -f docker/compose.yaml down -v
