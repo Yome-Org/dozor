@@ -39,6 +39,11 @@ This document defines the hard scope boundary for MVP `v0.1`.
 ## Configuration File Shape
 
 ```yaml
+context:
+  project: demo
+  environment: dev
+  # stack: core  # optional
+
 evaluation:
   window: 5m
   recovery_window: 2m
@@ -46,18 +51,18 @@ evaluation:
   debounce: 250ms
 
 components:
-  - name: database
+  - name: postgres
   - name: api
   - name: worker
 
 dependencies:
-  - upstream: database
+  - upstream: postgres
     downstream: api
   - upstream: api
     downstream: worker
 
 thresholds:
-  database:
+  postgres:
     critical: 3
     degraded: 3
 ```

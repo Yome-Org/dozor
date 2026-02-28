@@ -8,6 +8,7 @@ import com.yome.dozor.config.AppConfigLoader
 import com.yome.dozor.domain.Component
 import com.yome.dozor.domain.ComponentId
 import com.yome.dozor.domain.ThresholdConfig
+import com.yome.dozor.engine.AlertChannel
 import com.yome.dozor.engine.CompositeAlertPublisher
 import com.yome.dozor.engine.DeterministicEvaluationEngine
 import com.yome.dozor.engine.EvaluationRuntimeLoop
@@ -22,6 +23,7 @@ import com.yome.dozor.incident.DeterministicIncidentEngine
 import com.yome.dozor.persistence.FlywayMigrator
 import com.yome.dozor.persistence.JdbcConfig
 import com.yome.dozor.persistence.JdbcConnectionFactory
+import com.yome.dozor.persistence.PostgresAlertDeliveryRecorder
 import com.yome.dozor.persistence.PostgresAlertPublisher
 import com.yome.dozor.persistence.PostgresIncidentRepository
 import com.yome.dozor.persistence.PostgresSignalRepository
@@ -73,17 +75,25 @@ fun main() {
   val stateRepository = PostgresStateRepository(connectionFactory)
   val incidentRepository = PostgresIncidentRepository(connectionFactory)
 
-  val storageAlertPublisher = PostgresAlertPublisher(connectionFactory, channel = "telegram")
+  val deliveryRecorder = PostgresAlertDeliveryRecorder(connectionFactory)
+  val internalAlertPublisher =
+    PostgresAlertPublisher(connectionFactory, channel = AlertChannel.INTERNAL)
   val alertPublisher =
     if (config.telegram.enabled) {
       CompositeAlertPublisher(
         listOf(
-          storageAlertPublisher,
-          TelegramAlertPublisher(config.telegram.botToken, config.telegram.chatId),
+          internalAlertPublisher,
+          TelegramAlertPublisher(
+            config.telegram.botToken,
+            config.telegram.chatId,
+            deliveryRecorder,
+            components.associate { it.id to it.name },
+            config.context,
+          ),
         ),
       )
     } else {
-      storageAlertPublisher
+      internalAlertPublisher
     }
 
   val dirtyStore =

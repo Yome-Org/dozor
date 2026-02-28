@@ -1,6 +1,7 @@
 package com.yome.dozor.config
 
 data class AppConfig(
+  val context: ContextConfig,
   val evaluation: EvaluationConfig,
   val runtime: RuntimeConfig,
   val api: ApiConfig,
@@ -11,6 +12,12 @@ data class AppConfig(
   val dependencies: List<DependencyConfig>,
   val thresholds: Map<String, ThresholdItemConfig>,
   val checks: List<CheckConfig>,
+)
+
+data class ContextConfig(
+  val project: String,
+  val environment: String,
+  val stack: String?,
 )
 
 data class EvaluationConfig(

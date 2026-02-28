@@ -89,9 +89,16 @@ CREATE TABLE alerts (
   incident_id UUID NOT NULL REFERENCES incidents(id),
   type SMALLINT NOT NULL, -- 0=open, 1=resolved
   sent_at TIMESTAMP NOT NULL,
-  channel TEXT NOT NULL
+  channel TEXT NOT NULL,
+  delivery_status SMALLINT NOT NULL, -- 0=sent, 1=failed
+  error_message TEXT NULL
 );
 ```
+
+For `v0.1`, `alerts` stores alert delivery records.
+`channel` identifies the delivery target or sink, for example `internal` or `telegram`.
+`delivery_status` captures whether the record was persisted or the external delivery attempt succeeded.
+`error_message` stores transport-level failure details when available.
 
 ## Temporal Window Reconstruction
 

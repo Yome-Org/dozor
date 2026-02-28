@@ -15,7 +15,11 @@ This setup validates:
 - evaluation loop
 - state persistence
 - incident creation
-- alert persistence
+- alert delivery recording
+
+The local Docker setup intentionally uses `docker/dozor/dozor.demo.yaml`, which keeps
+the dependency graph and thresholds unchanged but shortens `incident_threshold` and
+`recovery_window` for faster open/resolve demos.
 
 ## Start
 
@@ -52,7 +56,7 @@ make compose-up
 
 `mock-health` starts in healthy mode.
 
-Health checks emit `INFO` for `database`.
+Health checks emit `INFO` for `postgres`.
 
 ### 2. Trigger failure
 
@@ -68,16 +72,24 @@ make fail
 
 Wait at least 3 failed checks.
 
-Current compose config uses:
+Current demo config uses:
 
+- `window: 25s`
 - `interval: 5s`
 - `failure_threshold: 3`
+- `incident_threshold: 5s`
+- `recovery_window: 15s`
 
-So `database` should become `CRITICAL` after roughly 15 seconds.
+With the current compose config, `postgres` typically reaches `CRITICAL` after roughly 25-30 seconds, not 15 seconds, because both:
+
+- health-check failure escalation
+- state-machine critical signal thresholds
+
+must accumulate.
 
 Expected propagation:
 
-- `database -> CRITICAL`
+- `postgres -> CRITICAL`
 - `api -> IMPACTED`
 - `worker -> IMPACTED`
 
@@ -117,7 +129,7 @@ SELECT id, root_component_id, started_at, resolved_at, status
 FROM incidents
 ORDER BY started_at DESC;
 
-SELECT incident_id, type, sent_at, channel
+SELECT incident_id, type, sent_at, channel, delivery_status, error_message
 FROM alerts
 ORDER BY sent_at DESC;
 ```
@@ -140,6 +152,13 @@ make demo-recover
 make demo-cycle
 ```
 
+The default `.env.example` uses:
+
+```env
+DEMO_CRITICAL_WAIT=30
+DEMO_RECOVERY_WAIT=30
+```
+
 ## Push API Check
 
 Dozor also exposes push ingestion:
@@ -148,7 +167,7 @@ Dozor also exposes push ingestion:
 curl -X POST http://localhost:8080/signal \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: demo-1" \
-  -d '{"component":"database","severity":"CRITICAL","source":"manual","occurredAt":"2026-02-22T12:00:00Z"}'
+  -d '{"component":"postgres","severity":"CRITICAL","source":"manual","occurredAt":"2026-02-22T12:00:00Z"}'
 ```
 
 Or:

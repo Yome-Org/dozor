@@ -19,7 +19,7 @@ import kotlin.test.assertTrue
 class DeterministicEvaluationEngineTest {
   @Test
   fun endToEndEvaluationForDbApiWorkerChain() {
-    val db = componentId("database")
+    val db = componentId("postgres")
     val api = componentId("api")
     val worker = componentId("worker")
 

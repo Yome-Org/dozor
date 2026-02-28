@@ -77,16 +77,29 @@ class DeterministicStateEvaluatorTest {
   }
 
   @Test
-  fun keepsPreviousDegradedDuringRecoveryWindowWithRecentSignals() {
+  fun keepsPreviousDegradedDuringRecoveryWindowWithRecentNonInfoSignals() {
     val signals =
       listOf(
-        Signal(componentId, Severity.INFO, now.minusSeconds(30)),
+        Signal(componentId, Severity.WARNING, now.minusSeconds(30)),
         Signal(componentId, Severity.INFO, now.minusSeconds(70)),
       )
 
     val state = evaluator.evaluate(signals, ComponentState.DEGRADED, config, now)
 
     assertEquals(ComponentState.DEGRADED, state)
+  }
+
+  @Test
+  fun recoversToHealthyWithRecentInfoOnlySignals() {
+    val signals =
+      listOf(
+        Signal(componentId, Severity.INFO, now.minusSeconds(30)),
+        Signal(componentId, Severity.INFO, now.minusSeconds(70)),
+      )
+
+    val state = evaluator.evaluate(signals, ComponentState.CRITICAL, config, now)
+
+    assertEquals(ComponentState.HEALTHY, state)
   }
 
   @Test

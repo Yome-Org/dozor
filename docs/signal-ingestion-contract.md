@@ -8,7 +8,7 @@
 
 ```json
 {
-  "component": "database",
+  "component": "postgres",
   "severity": "CRITICAL",
   "source": "health-check",
   "occurredAt": "2025-01-01T12:00:00Z",

@@ -75,6 +75,12 @@ For `Incident Resolved`:
 - root component
 - total incident duration
 
+For `v0.1`, each external delivery attempt may be persisted with:
+
+- channel
+- delivery status
+- transport-level error details when available
+
 ## 5. Deterministic Alerting Principle
 
 Alert decision must depend only on:

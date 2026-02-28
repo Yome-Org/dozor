@@ -113,31 +113,41 @@ No silent failure.
 
 ## Configuration
 
-v0.1 uses static YAML configuration:
+v0.1 uses static YAML configuration for system behavior:
 
+- installation context
 - components
 - dependencies
 - thresholds
 - temporal windows
+- health checks
 
 Runtime mutation is intentionally not supported in v1.
 
-Environment overrides are also supported through a local `.env` file or process environment.
+Deployment-specific settings are loaded from process environment variables.
 
-Supported variables:
+For local development, `make` and `docker compose --env-file .env ...` populate those
+environment variables from `.env`.
+
+The Kotlin process does not read `.env` directly.
+
+Required environment variables:
 
 - `API_HOST`
 - `API_PORT`
-- `POSTGRES_DB`
 - `POSTGRES_JDBC_URL`
 - `POSTGRES_USERNAME`
 - `POSTGRES_PASSWORD`
-- `POSTGRES_PORT`
 - `REDIS_ENABLED`
 - `REDIS_URI`
+- `TELEGRAM_ENABLED`
+
+Additional variables used by the local compose setup:
+
+- `POSTGRES_DB`
+- `POSTGRES_PORT`
 - `REDIS_PORT`
 - `MOCK_HEALTH_PORT`
-- `TELEGRAM_ENABLED`
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 
@@ -149,7 +159,7 @@ Dozor exposes a minimal ingestion contract:
 
 ```json
 {
-  "component": "database",
+  "component": "postgres",
   "severity": "CRITICAL",
   "source": "health-check",
   "occurredAt": "2025-01-01T12:00:00Z"
@@ -193,6 +203,10 @@ make compose-up
 - exposed local ports
 - Telegram delivery
 
+The local compose stack uses a demo runtime config with shortened `incident_threshold`
+and `recovery_window` so `make demo-cycle` can show both open and resolved transitions
+without waiting multiple minutes.
+
 See `docs/local-compose-setup.md`.
 
 ## Code Style
@@ -228,6 +242,13 @@ TELEGRAM_CHAT_ID=<your_chat_id>
 ```
 
 Then restart Dozor.
+
+Note:
+- Telegram messages use component names and formatted UTC timestamps.
+- `alerts.channel = internal` is the persisted internal alert record
+- `alerts.channel = telegram` means the delivery attempt targeted Telegram
+- `alerts.delivery_status` records whether that attempt succeeded or failed
+- `alerts.error_message` stores transport-level error details when delivery fails
 
 ## Non-Goals (v0.1)
 

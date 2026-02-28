@@ -1,0 +1,3 @@
+ALTER TABLE alerts
+  ADD COLUMN delivery_status SMALLINT NOT NULL DEFAULT 0,
+  ADD COLUMN error_message TEXT NULL;

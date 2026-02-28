@@ -1,11 +1,11 @@
 context:
   project: demo
-  environment: dev
+  environment: local
 
 evaluation:
-  window: 5m
-  recovery_window: 2m
-  incident_threshold: 2m
+  window: 25s
+  recovery_window: 15s
+  incident_threshold: 5s
   debounce: 250ms
 
 runtime:
@@ -36,7 +36,7 @@ thresholds:
 checks:
   - component: postgres
     type: http
-    url: http://localhost:5432/health
-    interval: 30s
-    timeout: 3s
+    url: http://mock-health:18080/health
+    interval: 5s
+    timeout: 2s
     failure_threshold: 3

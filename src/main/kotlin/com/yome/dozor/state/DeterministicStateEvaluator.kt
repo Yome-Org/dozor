@@ -38,9 +38,13 @@ class DeterministicStateEvaluator : StateEvaluator {
       previousState == ComponentState.CRITICAL || previousState == ComponentState.DEGRADED
     if (inRecovery) {
       val recoveryStart = now.minus(config.recoveryWindow)
-      val hasRecentSignals =
-        signals.any { !it.occurredAt.isAfter(now) && it.occurredAt.isAfter(recoveryStart) }
-      return if (!hasRecentSignals) ComponentState.HEALTHY else previousState
+      val hasRecentNonInfoSignals =
+        signals.any {
+          !it.occurredAt.isAfter(now) &&
+            it.occurredAt.isAfter(recoveryStart) &&
+            it.severity != Severity.INFO
+        }
+      return if (!hasRecentNonInfoSignals) ComponentState.HEALTHY else previousState
     }
 
     return ComponentState.HEALTHY

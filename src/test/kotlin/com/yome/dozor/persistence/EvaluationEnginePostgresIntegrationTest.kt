@@ -4,6 +4,8 @@ import com.yome.dozor.domain.ComponentState
 import com.yome.dozor.domain.Severity
 import com.yome.dozor.domain.Signal
 import com.yome.dozor.domain.ThresholdConfig
+import com.yome.dozor.engine.AlertChannel
+import com.yome.dozor.engine.AlertDeliveryStatus
 import com.yome.dozor.engine.DeterministicEvaluationEngine
 import com.yome.dozor.engine.ThresholdProvider
 import com.yome.dozor.incident.DeterministicIncidentEngine
@@ -50,12 +52,12 @@ class EvaluationEnginePostgresIntegrationTest {
 
   @Test
   fun persistsStateIncidentAndAlertAfterEvaluation() {
-    val db = componentId("database")
+    val db = componentId("postgres")
     val api = componentId("api")
     val worker = componentId("worker")
     val now = Instant.parse("2026-02-22T12:00:00Z")
 
-    seedComponents(db.value to "database", api.value to "api", worker.value to "worker")
+    seedComponents(db.value to "postgres", api.value to "api", worker.value to "worker")
     seedDependencies(db.value to api.value, api.value to worker.value)
     seedSignals(
       Signal(db, Severity.CRITICAL, now.minusSeconds(10)),
@@ -88,7 +90,12 @@ class EvaluationEnginePostgresIntegrationTest {
         signalRepository = PostgresSignalRepository(connectionFactory),
         stateRepository = PostgresStateRepository(connectionFactory),
         incidentRepository = PostgresIncidentRepository(connectionFactory),
-        alertPublisher = PostgresAlertPublisher(connectionFactory, channel = "telegram"),
+        alertPublisher =
+          PostgresAlertPublisher(
+            connectionFactory,
+            channel = AlertChannel.INTERNAL,
+            deliveryStatus = AlertDeliveryStatus.SENT,
+          ),
         stateEvaluator = DeterministicStateEvaluator(),
         propagationEngine = DeterministicPropagationEngine(),
         incidentEngine = DeterministicIncidentEngine(),
@@ -113,7 +120,9 @@ class EvaluationEnginePostgresIntegrationTest {
           assertEquals(1, rs.getInt("c"))
         }
         statement
-          .executeQuery("SELECT COUNT(*) AS c FROM alerts WHERE type = 0 AND channel = 'telegram'")
+          .executeQuery(
+            "SELECT COUNT(*) AS c FROM alerts WHERE type = 0 AND channel = 'internal' AND delivery_status = 0",
+          )
           .use { rs ->
             rs.next()
             assertEquals(1, rs.getInt("c"))

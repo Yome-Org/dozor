@@ -1,28 +1,22 @@
 package com.yome.dozor.config
 
-import io.github.cdimascio.dotenv.Dotenv
 import java.nio.file.Files
 import java.nio.file.Path
 import org.yaml.snakeyaml.Yaml
 
 class AppConfigLoader {
   fun load(path: Path): AppConfig {
-    val dotenv =
-      Dotenv.configure()
-        .directory(path.parent?.toString() ?: ".")
-        .ignoreIfMalformed()
-        .ignoreIfMissing()
-        .load()
     val yaml = Yaml()
     Files.newInputStream(path).use { input ->
       @Suppress("UNCHECKED_CAST") val root = yaml.load<Map<String, Any?>>(input)
       return AppConfig(
+        context = parseContext(root.requiredMap("context")),
         evaluation = parseEvaluation(root.requiredMap("evaluation")),
         runtime = parseRuntime(root.requiredMap("runtime")),
-        api = parseApi(root.requiredMap("api"), dotenv),
-        postgres = parsePostgres(root.requiredMap("postgres"), dotenv),
-        redis = parseRedis(root.requiredMap("redis"), dotenv),
-        telegram = parseTelegram(root.requiredMap("telegram"), dotenv),
+        api = parseApi(),
+        postgres = parsePostgres(),
+        redis = parseRedis(),
+        telegram = parseTelegram(),
         components =
           root.requiredList("components").map { item ->
             val map = item.requiredMapValue()
@@ -71,43 +65,67 @@ class AppConfigLoader {
   private fun parseRuntime(map: Map<String, Any?>): RuntimeConfig =
     RuntimeConfig(queueCapacity = map.requiredInt("queue_capacity"))
 
-  private fun parseApi(map: Map<String, Any?>, dotenv: Dotenv): ApiConfig =
+  private fun parseContext(map: Map<String, Any?>): ContextConfig =
+    ContextConfig(
+      project = map.requiredString("project"),
+      environment = map.requiredString("environment"),
+      stack = map.optionalString("stack"),
+    )
+
+  private fun parseApi(): ApiConfig =
     ApiConfig(
-      host = envString(dotenv, "API_HOST") ?: map.requiredString("host"),
-      port = envInt(dotenv, "API_PORT") ?: map.requiredInt("port"),
+      host = requireEnvString("API_HOST"),
+      port = requireEnvInt("API_PORT"),
     )
 
-  private fun parsePostgres(map: Map<String, Any?>, dotenv: Dotenv): PostgresConfig =
+  private fun parsePostgres(): PostgresConfig =
     PostgresConfig(
-      jdbcUrl = envString(dotenv, "POSTGRES_JDBC_URL") ?: map.requiredString("jdbc_url"),
-      username = envString(dotenv, "POSTGRES_USERNAME") ?: map.requiredString("username"),
-      password = envString(dotenv, "POSTGRES_PASSWORD") ?: map.requiredString("password"),
+      jdbcUrl = requireEnvString("POSTGRES_JDBC_URL"),
+      username = requireEnvString("POSTGRES_USERNAME"),
+      password = requireEnvString("POSTGRES_PASSWORD"),
     )
 
-  private fun parseRedis(map: Map<String, Any?>, dotenv: Dotenv): RedisConfig =
-    RedisConfig(
-      enabled = envBoolean(dotenv, "REDIS_ENABLED") ?: map.requiredBoolean("enabled"),
-      uri = envString(dotenv, "REDIS_URI") ?: map.requiredString("uri"),
+  private fun parseRedis(): RedisConfig {
+    val enabled = requireEnvBoolean("REDIS_ENABLED")
+    return RedisConfig(
+      enabled = enabled,
+      uri = if (enabled) requireEnvString("REDIS_URI") else envString("REDIS_URI") ?: "",
     )
+  }
 
-  private fun parseTelegram(map: Map<String, Any?>, dotenv: Dotenv): TelegramConfig =
-    TelegramConfig(
-      enabled = envBoolean(dotenv, "TELEGRAM_ENABLED") ?: map.requiredBoolean("enabled"),
-      botToken = envString(dotenv, "TELEGRAM_BOT_TOKEN") ?: map.requiredString("bot_token"),
-      chatId = envString(dotenv, "TELEGRAM_CHAT_ID") ?: map.requiredString("chat_id"),
+  private fun parseTelegram(): TelegramConfig {
+    val enabled = requireEnvBoolean("TELEGRAM_ENABLED")
+    return TelegramConfig(
+      enabled = enabled,
+      botToken =
+        if (enabled) requireEnvString("TELEGRAM_BOT_TOKEN")
+        else envString("TELEGRAM_BOT_TOKEN") ?: "",
+      chatId =
+        if (enabled) requireEnvString("TELEGRAM_CHAT_ID") else envString("TELEGRAM_CHAT_ID") ?: "",
     )
+  }
 }
 
-private fun envString(dotenv: Dotenv, key: String): String? =
-  dotenv[key]?.takeIf { it.isNotBlank() } ?: System.getenv(key)?.takeIf { it.isNotBlank() }
+private fun envString(key: String): String? = System.getenv(key)?.takeIf { it.isNotBlank() }
 
-private fun envInt(dotenv: Dotenv, key: String): Int? = envString(dotenv, key)?.toInt()
+private fun envInt(key: String): Int? = envString(key)?.toInt()
 
-private fun envBoolean(dotenv: Dotenv, key: String): Boolean? =
-  envString(dotenv, key)?.toBooleanStrict()
+private fun envBoolean(key: String): Boolean? = envString(key)?.toBooleanStrict()
+
+private fun requireEnvString(key: String): String =
+  envString(key) ?: error("Missing required environment variable: $key")
+
+private fun requireEnvInt(key: String): Int =
+  envInt(key) ?: error("Missing required environment variable: $key")
+
+private fun requireEnvBoolean(key: String): Boolean =
+  envBoolean(key) ?: error("Missing required environment variable: $key")
 
 private fun Map<String, Any?>.requiredString(key: String): String =
   this[key]?.toString() ?: error("Missing required string: $key")
+
+private fun Map<String, Any?>.optionalString(key: String): String? =
+  this[key]?.toString()?.takeIf { it.isNotBlank() }
 
 private fun Map<String, Any?>.requiredInt(key: String): Int {
   val value = this[key] ?: error("Missing required int: $key")

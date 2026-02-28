@@ -12,8 +12,13 @@ The state engine remains unchanged. Health checks are signal producers only.
 ## Configuration
 
 ```yaml
+context:
+  project: demo
+  environment: dev
+  # stack: core  # optional
+
 checks:
-  - component: database
+  - component: postgres
     type: http
     url: http://db:8080/health
     interval: 30s

@@ -23,7 +23,7 @@ class HealthSchedulerTest {
   fun escalatesToCriticalOnlyAfterConfiguredConsecutiveFailures() {
     val check =
       HealthCheck(
-        component = "database",
+        component = "postgres",
         type = HealthCheckType.HTTP,
         url = "http://example/health",
         interval = Duration.ofSeconds(30),
@@ -63,7 +63,7 @@ class HealthSchedulerTest {
   fun resetsFailureCounterAfterSuccessfulCheck() {
     val check =
       HealthCheck(
-        component = "database",
+        component = "postgres",
         type = HealthCheckType.HTTP,
         url = "http://example/health",
         interval = Duration.ofSeconds(30),
@@ -113,7 +113,7 @@ class HealthSchedulerTest {
       )
 
     return SignalIngestionService(
-      componentByName = mapOf("database" to componentId("database")),
+      componentByName = mapOf("postgres" to componentId("postgres")),
       repository = repository,
       temporalBucketStore = NoopTemporalBucketStore(),
       runtimeLoop = runtimeLoop,
