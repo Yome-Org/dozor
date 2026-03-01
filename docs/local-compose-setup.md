@@ -21,6 +21,9 @@ The local Docker setup intentionally uses `docker/dozor/dozor.demo.yaml`, which 
 the dependency graph and thresholds unchanged but shortens `incident_threshold` and
 `recovery_window` for faster open/resolve demos.
 
+The repository also contains `docker/dozor/dozor.reference.yaml` as a production-like
+reference configuration for embedding Dozor into another project stack.
+
 ## Start
 
 Prepare environment:
@@ -56,12 +59,12 @@ make compose-up
 
 `mock-health` starts in healthy mode.
 
-Health checks emit `INFO` for `postgres`.
+Health checks emit `INFO` for `mailer`.
 
 ### 2. Trigger failure
 
 ```bash
-curl "http://localhost:18080/toggle?healthy=false"
+curl "http://localhost:18080/toggle?component=mailer&healthy=false"
 ```
 
 Or:
@@ -80,7 +83,7 @@ Current demo config uses:
 - `incident_threshold: 5s`
 - `recovery_window: 15s`
 
-With the current compose config, `postgres` typically reaches `CRITICAL` after roughly 25-30 seconds, not 15 seconds, because both:
+With the current compose config, `mailer` typically reaches `CRITICAL` after roughly 25-30 seconds, not 15 seconds, because both:
 
 - health-check failure escalation
 - state-machine critical signal thresholds
@@ -89,14 +92,22 @@ must accumulate.
 
 Expected propagation:
 
-- `postgres -> CRITICAL`
+- `mailer -> CRITICAL`
 - `api -> IMPACTED`
 - `worker -> IMPACTED`
+- `notifier -> IMPACTED`
+- `web -> IMPACTED`
+
+Expected incident behavior:
+
+- one open incident only
+- root cause = `mailer`
+- downstream services remain `IMPACTED`, not independent root incidents
 
 ### 3. Recover
 
 ```bash
-curl "http://localhost:18080/toggle?healthy=true"
+curl "http://localhost:18080/toggle?component=mailer&healthy=true"
 ```
 
 Or:
@@ -150,6 +161,7 @@ Demo smoke flows:
 make demo-critical
 make demo-recover
 make demo-cycle
+make demo-shared-status
 ```
 
 The default `.env.example` uses:
@@ -167,7 +179,7 @@ Dozor also exposes push ingestion:
 curl -X POST http://localhost:8080/signal \
   -H "Content-Type: application/json" \
   -H "Idempotency-Key: demo-1" \
-  -d '{"component":"postgres","severity":"CRITICAL","source":"manual","occurredAt":"2026-02-22T12:00:00Z"}'
+  -d '{"component":"mailer","severity":"CRITICAL","source":"manual","occurredAt":"2026-02-22T12:00:00Z"}'
 ```
 
 Or:

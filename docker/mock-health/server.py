@@ -1,7 +1,8 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import parse_qs, urlparse
 
-STATE = {"healthy": True}
+DEFAULT_COMPONENTS = ["mailer"]
+STATE = {name: True for name in DEFAULT_COMPONENTS}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -9,7 +10,21 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
 
         if parsed.path == "/health":
-            if STATE["healthy"]:
+            component = "mailer"
+            if STATE.get(component, True):
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"status":"ok"}')
+            else:
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b'{"status":"fail"}')
+            return
+
+        if parsed.path.startswith("/health/"):
+            component = parsed.path.split("/", 2)[2]
+            healthy = STATE.get(component, True)
+            if healthy:
                 self.send_response(200)
                 self.end_headers()
                 self.wfile.write(b'{"status":"ok"}')
@@ -22,16 +37,20 @@ class Handler(BaseHTTPRequestHandler):
         if parsed.path == "/toggle":
             params = parse_qs(parsed.query)
             healthy = params.get("healthy", [None])[0]
+            component = params.get("component", ["mailer"])[0]
             if healthy is None:
                 self.send_response(400)
                 self.end_headers()
                 self.wfile.write(b'missing healthy query param')
                 return
 
-            STATE["healthy"] = healthy.lower() == "true"
+            STATE[component] = healthy.lower() == "true"
             self.send_response(200)
             self.end_headers()
-            body = ('{"healthy": %s}' % ('true' if STATE["healthy"] else 'false')).encode()
+            body = (
+                '{"component":"%s","healthy": %s}'
+                % (component, 'true' if STATE[component] else 'false')
+            ).encode()
             self.wfile.write(body)
             return
 

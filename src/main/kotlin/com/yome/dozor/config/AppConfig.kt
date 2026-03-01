@@ -74,4 +74,7 @@ data class CheckConfig(
   val interval: String,
   val timeout: String,
   val failureThreshold: Int,
+  val expectedStatus: Int,
+  val bodyContains: String?,
+  val contentTypeContains: String?,
 )

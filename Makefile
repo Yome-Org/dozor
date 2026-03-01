@@ -9,6 +9,7 @@ API_PORT ?= 8080
 POSTGRES_DB ?= dozor
 POSTGRES_USERNAME ?= dozor
 MOCK_HEALTH_PORT ?= 18080
+DEMO_FAILURE_COMPONENT ?= mailer
 DEMO_CRITICAL_WAIT ?= 30
 DEMO_RECOVERY_WAIT ?= 30
 
@@ -16,7 +17,7 @@ COMPOSE := docker compose --env-file $(ENV_FILE) -f docker/compose.yaml
 
 .PHONY: env-init test run compose-up compose-down compose-logs compose-ps rebuild restart \
 	fail ok psql signal config incident-open incident-history alert-list alerts-open state-list \
-	demo-critical demo-recover demo-cycle fmt fmt-check
+	demo-critical demo-recover demo-cycle demo-shared-status fmt fmt-check
 
 env-init:
 	cp -n .env.example $(ENV_FILE) || true
@@ -52,10 +53,10 @@ restart:
 	$(COMPOSE) restart dozor
 
 fail:
-	curl "http://localhost:$(MOCK_HEALTH_PORT)/toggle?healthy=false"
+	curl "http://localhost:$(MOCK_HEALTH_PORT)/toggle?component=$(DEMO_FAILURE_COMPONENT)&healthy=false"
 
 ok:
-	curl "http://localhost:$(MOCK_HEALTH_PORT)/toggle?healthy=true"
+	curl "http://localhost:$(MOCK_HEALTH_PORT)/toggle?component=$(DEMO_FAILURE_COMPONENT)&healthy=true"
 
 psql:
 	docker exec -it $$(docker ps -qf name=postgres) psql -U $(POSTGRES_USERNAME) -d $(POSTGRES_DB)
@@ -108,11 +109,19 @@ demo-cycle:
 	@$(MAKE) demo-critical
 	@$(MAKE) demo-recover
 
+demo-shared-status:
+	@echo "==> shared dependency states"
+	@$(MAKE) state-list
+	@echo "==> root incidents"
+	@$(MAKE) incident-open
+	@echo "==> alert deliveries"
+	@$(MAKE) alert-list
+
 signal:
 	curl -X POST http://localhost:$(API_PORT)/signal \
 	  -H "Content-Type: application/json" \
 	  -H "Idempotency-Key: make-demo-1" \
-	  -d '{"component":"postgres","severity":"CRITICAL","source":"manual","occurredAt":"2026-02-22T12:00:00Z"}'
+	  -d '{"component":"mailer","severity":"CRITICAL","source":"manual","occurredAt":"2026-02-22T12:00:00Z"}'
 
 config:
 	$(COMPOSE) config

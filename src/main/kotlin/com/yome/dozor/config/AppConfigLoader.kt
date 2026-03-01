@@ -48,6 +48,9 @@ class AppConfigLoader {
               interval = map.requiredString("interval"),
               timeout = map.requiredString("timeout"),
               failureThreshold = map.optionalInt("failure_threshold", 1),
+              expectedStatus = map.optionalInt("expected_status", 200),
+              bodyContains = map.optionalString("body_contains"),
+              contentTypeContains = map.optionalString("content_type_contains"),
             )
           },
       )

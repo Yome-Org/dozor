@@ -7,6 +7,7 @@ import com.yome.dozor.engine.AlertDeliveryRecord
 import com.yome.dozor.engine.AlertDeliveryRecorder
 import com.yome.dozor.engine.AlertDeliveryStatus
 import com.yome.dozor.engine.AlertPublisher
+import com.yome.dozor.engine.AlertSnapshot
 import com.yome.dozor.engine.AlertType
 import com.yome.dozor.incident.Incident
 import com.yome.dozor.incident.IncidentTransition
@@ -36,6 +37,7 @@ class TelegramAlertPublisher(
 
   override fun publish(
     transition: IncidentTransition,
+    snapshot: AlertSnapshot,
     now: Instant,
   ) {
     transition.opened.forEach {
@@ -43,7 +45,7 @@ class TelegramAlertPublisher(
         incident = it,
         type = AlertType.OPEN,
         now = now,
-        message = formatOpenIncident(it),
+        message = formatOpenIncident(it, snapshot),
       )
     }
     transition.resolved.forEach {
@@ -56,13 +58,20 @@ class TelegramAlertPublisher(
     }
   }
 
-  private fun formatOpenIncident(incident: Incident): String = buildString {
+  private fun formatOpenIncident(
+    incident: Incident,
+    snapshot: AlertSnapshot,
+  ): String = buildString {
     appendLine("❗ INCIDENT OPEN (${shortIncidentId(incident)})")
     appendLine("Project: ${context.project}")
     appendLine("Environment: ${context.environment}")
     context.stack?.let { appendLine("Stack: $it") }
     appendLine("Component: ${componentName(incident)}")
     appendLine("Severity: Critical")
+    val impacted = impactedComponents(incident, snapshot)
+    if (impacted.isNotEmpty()) {
+      appendLine("Impacted: ${impacted.joinToString(", ")}")
+    }
     append("Started: ${formatTimestamp(incident.startedAt)}")
   }
 
@@ -154,6 +163,16 @@ class TelegramAlertPublisher(
     componentNames[incident.rootComponentId] ?: incident.rootComponentId.toString()
 
   private fun shortIncidentId(incident: Incident): String = incident.id.toString().take(8)
+
+  private fun impactedComponents(
+    incident: Incident,
+    snapshot: AlertSnapshot,
+  ): List<String> =
+    snapshot.graph
+      .allDownstreamOf(incident.rootComponentId)
+      .filter { snapshot.effectiveStates[it] == com.yome.dozor.domain.ComponentState.IMPACTED }
+      .map { componentNames[it] ?: it.toString() }
+      .sorted()
 
   private fun formatTimestamp(instant: Instant): String = timestampFormatter.format(instant)
 

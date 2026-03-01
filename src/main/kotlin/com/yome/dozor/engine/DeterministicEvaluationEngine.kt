@@ -53,7 +53,11 @@ class DeterministicEvaluationEngine(
 
     stateRepository.saveAll(effective)
     incidentRepository.saveTransition(transition)
-    alertPublisher.publish(transition, now)
+    alertPublisher.publish(
+      transition,
+      AlertSnapshot(effectiveStates = effective, graph = graph),
+      now
+    )
 
     return EvaluationResult(
       isolatedStates = isolatedChanged,
