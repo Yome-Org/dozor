@@ -37,8 +37,10 @@ import io.ktor.server.netty.Netty
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 import java.util.UUID
+import java.util.logging.Logger
 
 fun main() {
+  val logger = Logger.getLogger("com.yome.dozor.bootstrap.Application")
   val configPath = Path.of(System.getenv("DOZOR_CONFIG") ?: "config/dozor.yaml")
   val config = AppConfigLoader().load(configPath)
 
@@ -173,9 +175,27 @@ fun main() {
   val healthScheduler = HealthScheduler(healthChecks, ingestion)
   healthScheduler.start()
 
+  logger.info(
+    buildString {
+      append("Dozor startup: ")
+      append("configPath=").append(configPath)
+      append(", project=").append(config.context.project)
+      append(", environment=").append(config.context.environment)
+      config.context.stack?.let { append(", stack=").append(it) }
+      append(", api=").append(config.api.host).append(":").append(config.api.port)
+      append(", postgres=").append(config.postgres.jdbcUrl)
+      append(", redisEnabled=").append(config.redis.enabled)
+      append(", telegramEnabled=").append(config.telegram.enabled)
+      append(", components=").append(components.size)
+      append(", dependencies=").append(edges.size)
+      append(", checks=").append(healthChecks.size)
+    }
+  )
+
   Runtime.getRuntime()
     .addShutdownHook(
       Thread {
+        logger.info("Dozor shutdown: stopping health scheduler and evaluation loop")
         healthScheduler.stop()
         runtimeLoop.stop()
       },

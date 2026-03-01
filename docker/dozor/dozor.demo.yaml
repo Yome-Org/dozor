@@ -17,6 +17,8 @@ components:
   - name: worker
   - name: notifier
   - name: web
+  - name: homepage
+  - name: sitemap
 
 dependencies:
   - upstream: mailer
@@ -44,6 +46,12 @@ thresholds:
   web:
     critical: 3
     degraded: 3
+  homepage:
+    critical: 3
+    degraded: 3
+  sitemap:
+    critical: 3
+    degraded: 3
 
 checks:
   - component: mailer
@@ -52,3 +60,21 @@ checks:
     interval: 5s
     timeout: 2s
     failure_threshold: 3
+  - component: homepage
+    type: http
+    url: http://mock-health:18080/checks/html
+    interval: 5s
+    timeout: 2s
+    failure_threshold: 3
+    expected_status: 200
+    body_contains: "<title>Example</title>"
+    content_type_contains: html
+  - component: sitemap
+    type: http
+    url: http://mock-health:18080/checks/sitemap.xml
+    interval: 5s
+    timeout: 2s
+    failure_threshold: 3
+    expected_status: 200
+    body_contains: "<urlset"
+    content_type_contains: xml
