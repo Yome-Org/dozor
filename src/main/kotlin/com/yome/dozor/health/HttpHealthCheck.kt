@@ -13,13 +13,29 @@ class HttpHealthCheck(
   override fun execute(check: HealthCheck): HealthCheckResult {
     val request = HttpRequest.newBuilder(URI.create(check.url)).timeout(check.timeout).GET().build()
 
-    return runCatching { client.send(request, HttpResponse.BodyHandlers.discarding()) }
+    return runCatching { client.send(request, HttpResponse.BodyHandlers.ofString()) }
       .fold(
         onSuccess = { response ->
-          if (response.statusCode() in 200..299) {
-            HealthCheckResult(healthy = true, details = "status=${response.statusCode()}")
+          val statusMatches = response.statusCode() == check.expectedStatus
+          val contentType = response.headers().firstValue("content-type").orElse("")
+          val contentTypeMatches =
+            check.contentTypeContains?.let { expected ->
+              contentType.contains(expected, ignoreCase = true)
+            } ?: true
+          val bodyMatches =
+            check.bodyContains?.let { expected -> response.body().contains(expected) } ?: true
+
+          if (statusMatches && contentTypeMatches && bodyMatches) {
+            HealthCheckResult(
+              healthy = true,
+              details = "status=${response.statusCode()} contentType=$contentType",
+            )
           } else {
-            HealthCheckResult(healthy = false, details = "status=${response.statusCode()}")
+            HealthCheckResult(
+              healthy = false,
+              details =
+                "status=${response.statusCode()} expectedStatus=${check.expectedStatus} contentType=$contentType bodyContainsMatched=$bodyMatches contentTypeMatched=$contentTypeMatches",
+            )
           }
         },
         onFailure = { ex -> HealthCheckResult(healthy = false, details = ex.javaClass.simpleName) },

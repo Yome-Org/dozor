@@ -8,10 +8,11 @@ class CompositeAlertPublisher(
 ) : AlertPublisher {
   override fun publish(
     transition: IncidentTransition,
+    snapshot: AlertSnapshot,
     now: Instant,
   ) {
     for (delegate in delegates) {
-      delegate.publish(transition, now)
+      delegate.publish(transition, snapshot, now)
     }
   }
 }

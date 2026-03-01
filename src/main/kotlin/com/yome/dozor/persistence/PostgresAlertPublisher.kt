@@ -3,6 +3,7 @@ package com.yome.dozor.persistence
 import com.yome.dozor.engine.AlertDeliveryRecord
 import com.yome.dozor.engine.AlertDeliveryStatus
 import com.yome.dozor.engine.AlertPublisher
+import com.yome.dozor.engine.AlertSnapshot
 import com.yome.dozor.engine.AlertType
 import com.yome.dozor.incident.IncidentTransition
 import java.time.Instant
@@ -17,6 +18,7 @@ class PostgresAlertPublisher(
 
   override fun publish(
     transition: IncidentTransition,
+    snapshot: AlertSnapshot,
     now: Instant,
   ) {
     val records =

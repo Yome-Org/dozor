@@ -87,4 +87,77 @@ class DeterministicEvaluationEngineTest {
     assertTrue(second.incidentTransition.resolved.isEmpty())
     assertEquals(first.effectiveStates, second.effectiveStates)
   }
+
+  @Test
+  fun opensSingleIncidentForSharedDependencyFailure() {
+    val mailer = componentId("mailer")
+    val api = componentId("api")
+    val worker = componentId("worker")
+    val notifier = componentId("notifier")
+    val web = componentId("web")
+
+    val graph =
+      DependencyGraph.from(
+        components = setOf(mailer, api, worker, notifier, web),
+        edges =
+          setOf(
+            DependencyEdge(mailer, api),
+            DependencyEdge(mailer, worker),
+            DependencyEdge(mailer, notifier),
+            DependencyEdge(api, web),
+          ),
+      )
+
+    val now = Instant.parse("2026-02-22T12:00:00Z")
+    val signalRepository = InMemorySignalRepository()
+    signalRepository.append(Signal(mailer, Severity.CRITICAL, now.minusSeconds(10)))
+    signalRepository.append(Signal(mailer, Severity.CRITICAL, now.minusSeconds(20)))
+    signalRepository.append(Signal(mailer, Severity.CRITICAL, now.minusSeconds(30)))
+
+    val stateRepository =
+      InMemoryStateRepository(
+        initialStates =
+          mapOf(
+            mailer to ComponentState.HEALTHY,
+            api to ComponentState.HEALTHY,
+            worker to ComponentState.HEALTHY,
+            notifier to ComponentState.HEALTHY,
+            web to ComponentState.HEALTHY,
+          ),
+      )
+    val incidentRepository = InMemoryIncidentRepository()
+    val alertPublisher = InMemoryAlertPublisher()
+
+    val threshold =
+      ThresholdConfig(
+        criticalThreshold = 3,
+        degradedThreshold = 3,
+        window = Duration.ofMinutes(5),
+        recoveryWindow = Duration.ofMinutes(2),
+      )
+
+    val engine =
+      DeterministicEvaluationEngine(
+        graph = graph,
+        thresholdProvider = ThresholdProvider { threshold },
+        signalRepository = signalRepository,
+        stateRepository = stateRepository,
+        incidentRepository = incidentRepository,
+        alertPublisher = alertPublisher,
+        stateEvaluator = DeterministicStateEvaluator(),
+        propagationEngine = DeterministicPropagationEngine(),
+        incidentEngine = DeterministicIncidentEngine(),
+      )
+
+    val result = engine.evaluate(dirtyComponents = setOf(mailer), now = now)
+
+    assertEquals(ComponentState.CRITICAL, result.effectiveStates[mailer])
+    assertEquals(ComponentState.IMPACTED, result.effectiveStates[api])
+    assertEquals(ComponentState.IMPACTED, result.effectiveStates[worker])
+    assertEquals(ComponentState.IMPACTED, result.effectiveStates[notifier])
+    assertEquals(ComponentState.IMPACTED, result.effectiveStates[web])
+    assertEquals(setOf(mailer), result.rootCauses)
+    assertEquals(1, result.incidentTransition.opened.size)
+    assertEquals(mailer, result.incidentTransition.opened.single().rootComponentId)
+  }
 }

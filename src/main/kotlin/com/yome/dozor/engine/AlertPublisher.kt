@@ -6,6 +6,7 @@ import java.time.Instant
 interface AlertPublisher {
   fun publish(
     transition: IncidentTransition,
+    snapshot: AlertSnapshot,
     now: Instant,
   )
 }

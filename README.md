@@ -179,6 +179,18 @@ See `docs/signal-ingestion-contract.md`.
 Dozor also supports pull-based health checks as an additional signal source.
 See `docs/health-check-model.md`.
 
+For guidance on service-local health endpoints versus Dozor dependency propagation, see
+`docs/service-health-model.md`.
+
+The same `http` check type can validate:
+
+- JSON health endpoints
+- HTML pages
+- XML resources such as `sitemap.xml`
+
+using simple match rules like `expected_status`, `body_contains`, and
+`content_type_contains`.
+
 ## Local Compose Setup
 
 For a full local vertical slice with `dozor`, `postgres`, `redis`, and a mock health service:
@@ -206,6 +218,20 @@ make compose-up
 The local compose stack uses a demo runtime config with shortened `incident_threshold`
 and `recovery_window` so `make demo-cycle` can show both open and resolved transitions
 without waiting multiple minutes.
+
+The default demo topology models a shared dependency failure:
+
+- `mailer -> api`
+- `mailer -> worker`
+- `mailer -> notifier`
+- `api -> web`
+
+This demonstrates one root incident with multiple downstream impacted components.
+
+Configuration files in `docker/dozor/` have distinct roles:
+
+- `dozor.demo.yaml`: local demonstration config used by the Docker image in this repository
+- `dozor.reference.yaml`: production-like reference config intended as a starting point for embedding Dozor into another project stack
 
 See `docs/local-compose-setup.md`.
 

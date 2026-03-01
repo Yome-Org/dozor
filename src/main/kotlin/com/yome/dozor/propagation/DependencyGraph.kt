@@ -31,6 +31,21 @@ private constructor(
     return visited
   }
 
+  fun allDownstreamOf(componentId: ComponentId): Set<ComponentId> {
+    val visited = linkedSetOf<ComponentId>()
+    val queue = ArrayDeque<ComponentId>()
+    queue.addAll(downstreamOf(componentId))
+
+    while (queue.isNotEmpty()) {
+      val current = queue.removeFirst()
+      if (visited.add(current)) {
+        queue.addAll(downstreamOf(current))
+      }
+    }
+
+    return visited
+  }
+
   fun topologicalOrder(): List<ComponentId> = topoOrder
 
   companion object {

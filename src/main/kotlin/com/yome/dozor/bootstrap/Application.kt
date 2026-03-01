@@ -165,6 +165,9 @@ fun main() {
         interval = parseDuration(check.interval),
         timeout = parseDuration(check.timeout),
         failureThreshold = check.failureThreshold,
+        expectedStatus = check.expectedStatus,
+        bodyContains = check.bodyContains,
+        contentTypeContains = check.contentTypeContains,
       )
     }
   val healthScheduler = HealthScheduler(healthChecks, ingestion)

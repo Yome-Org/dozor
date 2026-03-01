@@ -13,6 +13,9 @@ data class HealthCheck(
   val interval: Duration,
   val timeout: Duration,
   val failureThreshold: Int,
+  val expectedStatus: Int = 200,
+  val bodyContains: String? = null,
+  val contentTypeContains: String? = null,
 )
 
 data class HealthCheckResult(

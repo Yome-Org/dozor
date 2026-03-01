@@ -12,18 +12,24 @@ runtime:
   queue_capacity: 1024
 
 components:
-  - name: postgres
+  - name: mailer
   - name: api
   - name: worker
+  - name: notifier
+  - name: web
 
 dependencies:
-  - upstream: postgres
+  - upstream: mailer
     downstream: api
-  - upstream: api
+  - upstream: mailer
     downstream: worker
+  - upstream: mailer
+    downstream: notifier
+  - upstream: api
+    downstream: web
 
 thresholds:
-  postgres:
+  mailer:
     critical: 3
     degraded: 3
   api:
@@ -32,11 +38,17 @@ thresholds:
   worker:
     critical: 3
     degraded: 3
+  notifier:
+    critical: 3
+    degraded: 3
+  web:
+    critical: 3
+    degraded: 3
 
 checks:
-  - component: postgres
+  - component: mailer
     type: http
-    url: http://mock-health:18080/health
+    url: http://mock-health:18080/health/mailer
     interval: 5s
     timeout: 2s
     failure_threshold: 3
