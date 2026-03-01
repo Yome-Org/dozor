@@ -45,6 +45,9 @@ No alerts for:
 - Impacted
 - transient Critical (below threshold)
 
+Runtime errors may still be ingested as signals, but they do not bypass incident
+thresholds. See `docs/error-signal-model.md`.
+
 ## 3. Alert Grouping
 
 Within a single incident:

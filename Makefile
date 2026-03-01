@@ -10,14 +10,16 @@ POSTGRES_DB ?= dozor
 POSTGRES_USERNAME ?= dozor
 MOCK_HEALTH_PORT ?= 18080
 DEMO_FAILURE_COMPONENT ?= mailer
+DEMO_RUNTIME_COMPONENT ?= worker
 DEMO_CRITICAL_WAIT ?= 30
 DEMO_RECOVERY_WAIT ?= 30
 
 COMPOSE := docker compose --env-file $(ENV_FILE) -f docker/compose.yaml
 
 .PHONY: env-init test run compose-up compose-down compose-logs compose-ps rebuild restart \
-	fail ok psql signal config incident-open incident-history alert-list alerts-open state-list \
-	demo-critical demo-recover demo-cycle demo-shared-status fmt fmt-check
+	fail ok psql signal runtime-warning runtime-critical config incident-open incident-history \
+	alert-list alerts-open state-list fail-html ok-html fail-xml ok-xml demo-critical \
+	demo-recover demo-cycle demo-shared-status fmt fmt-check
 
 env-init:
 	cp -n .env.example $(ENV_FILE) || true
@@ -57,6 +59,18 @@ fail:
 
 ok:
 	curl "http://localhost:$(MOCK_HEALTH_PORT)/toggle?component=$(DEMO_FAILURE_COMPONENT)&healthy=true"
+
+fail-html:
+	curl "http://localhost:$(MOCK_HEALTH_PORT)/toggle?component=homepage&healthy=false"
+
+ok-html:
+	curl "http://localhost:$(MOCK_HEALTH_PORT)/toggle?component=homepage&healthy=true"
+
+fail-xml:
+	curl "http://localhost:$(MOCK_HEALTH_PORT)/toggle?component=sitemap&healthy=false"
+
+ok-xml:
+	curl "http://localhost:$(MOCK_HEALTH_PORT)/toggle?component=sitemap&healthy=true"
 
 psql:
 	docker exec -it $$(docker ps -qf name=postgres) psql -U $(POSTGRES_USERNAME) -d $(POSTGRES_DB)
@@ -122,6 +136,18 @@ signal:
 	  -H "Content-Type: application/json" \
 	  -H "Idempotency-Key: make-demo-1" \
 	  -d '{"component":"mailer","severity":"CRITICAL","source":"manual","occurredAt":"2026-02-22T12:00:00Z"}'
+
+runtime-warning:
+	curl -X POST http://localhost:$(API_PORT)/signal \
+	  -H "Content-Type: application/json" \
+	  -H "Idempotency-Key: runtime-warning-$$(date -u +%s)" \
+	  -d '{"component":"$(DEMO_RUNTIME_COMPONENT)","severity":"WARNING","source":"runtime-error","occurredAt":"'$$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"}'
+
+runtime-critical:
+	curl -X POST http://localhost:$(API_PORT)/signal \
+	  -H "Content-Type: application/json" \
+	  -H "Idempotency-Key: runtime-critical-$$(date -u +%s)" \
+	  -d '{"component":"$(DEMO_RUNTIME_COMPONENT)","severity":"CRITICAL","source":"runtime-error","occurredAt":"'$$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"}'
 
 config:
 	$(COMPOSE) config

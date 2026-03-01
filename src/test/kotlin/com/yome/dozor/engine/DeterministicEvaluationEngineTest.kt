@@ -160,4 +160,104 @@ class DeterministicEvaluationEngineTest {
     assertEquals(1, result.incidentTransition.opened.size)
     assertEquals(mailer, result.incidentTransition.opened.single().rootComponentId)
   }
+
+  @Test
+  fun repeatedWarningSignalsDegradeComponentWithoutOpeningIncident() {
+    val worker = componentId("worker")
+    val graph = DependencyGraph.from(components = setOf(worker), edges = emptySet())
+
+    val now = Instant.parse("2026-02-22T12:00:00Z")
+    val signalRepository = InMemorySignalRepository()
+    signalRepository.append(Signal(worker, Severity.WARNING, now.minusSeconds(10)))
+    signalRepository.append(Signal(worker, Severity.WARNING, now.minusSeconds(20)))
+    signalRepository.append(Signal(worker, Severity.WARNING, now.minusSeconds(30)))
+
+    val stateRepository =
+      InMemoryStateRepository(
+        initialStates =
+          mapOf(
+            worker to ComponentState.HEALTHY,
+          ),
+      )
+    val incidentRepository = InMemoryIncidentRepository()
+    val alertPublisher = InMemoryAlertPublisher()
+
+    val threshold =
+      ThresholdConfig(
+        criticalThreshold = 3,
+        degradedThreshold = 3,
+        window = Duration.ofMinutes(5),
+        recoveryWindow = Duration.ofMinutes(2),
+      )
+
+    val engine =
+      DeterministicEvaluationEngine(
+        graph = graph,
+        thresholdProvider = ThresholdProvider { threshold },
+        signalRepository = signalRepository,
+        stateRepository = stateRepository,
+        incidentRepository = incidentRepository,
+        alertPublisher = alertPublisher,
+        stateEvaluator = DeterministicStateEvaluator(),
+        propagationEngine = DeterministicPropagationEngine(),
+        incidentEngine = DeterministicIncidentEngine(),
+      )
+
+    val result = engine.evaluate(dirtyComponents = setOf(worker), now = now)
+
+    assertEquals(ComponentState.DEGRADED, result.effectiveStates[worker])
+    assertTrue(result.rootCauses.isEmpty())
+    assertTrue(result.incidentTransition.opened.isEmpty())
+    assertTrue(result.incidentTransition.resolved.isEmpty())
+  }
+
+  @Test
+  fun repeatedCriticalRuntimeSignalsOpenIncident() {
+    val worker = componentId("worker")
+    val graph = DependencyGraph.from(components = setOf(worker), edges = emptySet())
+
+    val now = Instant.parse("2026-02-22T12:00:00Z")
+    val signalRepository = InMemorySignalRepository()
+    signalRepository.append(Signal(worker, Severity.CRITICAL, now.minusSeconds(10)))
+    signalRepository.append(Signal(worker, Severity.CRITICAL, now.minusSeconds(20)))
+    signalRepository.append(Signal(worker, Severity.CRITICAL, now.minusSeconds(30)))
+
+    val stateRepository =
+      InMemoryStateRepository(
+        initialStates =
+          mapOf(
+            worker to ComponentState.HEALTHY,
+          ),
+      )
+    val incidentRepository = InMemoryIncidentRepository()
+    val alertPublisher = InMemoryAlertPublisher()
+
+    val threshold =
+      ThresholdConfig(
+        criticalThreshold = 3,
+        degradedThreshold = 3,
+        window = Duration.ofMinutes(5),
+        recoveryWindow = Duration.ofMinutes(2),
+      )
+
+    val engine =
+      DeterministicEvaluationEngine(
+        graph = graph,
+        thresholdProvider = ThresholdProvider { threshold },
+        signalRepository = signalRepository,
+        stateRepository = stateRepository,
+        incidentRepository = incidentRepository,
+        alertPublisher = alertPublisher,
+        stateEvaluator = DeterministicStateEvaluator(),
+        propagationEngine = DeterministicPropagationEngine(),
+        incidentEngine = DeterministicIncidentEngine(),
+      )
+
+    val result = engine.evaluate(dirtyComponents = setOf(worker), now = now)
+
+    assertEquals(ComponentState.CRITICAL, result.effectiveStates[worker])
+    assertEquals(setOf(worker), result.rootCauses)
+    assertEquals(1, result.incidentTransition.opened.size)
+    assertEquals(worker, result.incidentTransition.opened.single().rootComponentId)
+  }
 }

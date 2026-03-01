@@ -17,6 +17,9 @@ This setup validates:
 - incident creation
 - alert delivery recording
 
+The main demo scenario remains focused on shared dependency propagation through `mailer`.
+Additional HTTP check types are available as manual secondary scenarios.
+
 The local Docker setup intentionally uses `docker/dozor/dozor.demo.yaml`, which keeps
 the dependency graph and thresholds unchanged but shortens `incident_threshold` and
 `recovery_window` for faster open/resolve demos.
@@ -50,6 +53,13 @@ Equivalent `Makefile` flow:
 
 ```bash
 make env-init
+make compose-up
+```
+
+If `.env` or `docker/dozor/dozor.demo.yaml` changes, restart the stack:
+
+```bash
+make compose-down
 make compose-up
 ```
 
@@ -116,7 +126,7 @@ Or:
 make ok
 ```
 
-Recovery signals will return to `INFO`.
+Recovery checks will return to `INFO` signals.
 
 ## Inspect Postgres
 
@@ -163,6 +173,40 @@ make demo-recover
 make demo-cycle
 make demo-shared-status
 ```
+
+## Additional HTTP Check Scenarios
+
+The local demo also exposes two additional independent HTTP check scenarios:
+
+- `homepage`: HTML body marker validation
+- `sitemap`: XML body marker validation
+
+These checks are intentionally separate from the main shared-dependency incident demo.
+
+Mock endpoints:
+
+- `http://localhost:18080/checks/html`
+- `http://localhost:18080/checks/sitemap.xml`
+
+Manual scenarios:
+
+```bash
+make fail-html
+sleep 30
+make state-list
+```
+
+```bash
+make fail-xml
+sleep 30
+make state-list
+```
+
+Expected behavior:
+
+- `homepage` and `sitemap` are evaluated as independent components
+- each may become `Degraded` or `Critical` based on its own signals
+- these scenarios demonstrate response matching, not dependency propagation
 
 The default `.env.example` uses:
 

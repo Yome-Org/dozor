@@ -13,8 +13,8 @@ It is designed to:
 - emit actionable alerts
 - remain predictable under failure
 
-Dozor is not a traditional monitoring tool.
-It is a state evaluation engine.
+Dozor is not a traditional monitoring suite.
+It is a deterministic state evaluation engine.
 
 ## Core Principles
 
@@ -176,11 +176,23 @@ Response behavior:
 
 See `docs/signal-ingestion-contract.md`.
 
+Runtime error signals use the same contract. A practical default is:
+
+- isolated recoverable exception -> `WARNING`
+- repeated job failure -> `WARNING`
+- hard outage symptom -> `CRITICAL`
+
 Dozor also supports pull-based health checks as an additional signal source.
 See `docs/health-check-model.md`.
 
 For guidance on service-local health endpoints versus Dozor dependency propagation, see
 `docs/service-health-model.md`.
+
+For guidance on runtime errors and event-style signals versus incident-based alerting, see
+`docs/error-signal-model.md`.
+
+Dozor may ingest operational runtime error signals, but it is not intended to replace full
+error analysis tooling such as exception aggregation, stack trace search, or debugging UIs.
 
 The same `http` check type can validate:
 
@@ -228,10 +240,22 @@ The default demo topology models a shared dependency failure:
 
 This demonstrates one root incident with multiple downstream impacted components.
 
+The same local stack also includes secondary HTTP check examples for:
+
+- HTML body marker matching
+- XML / `sitemap.xml` matching
+
 Configuration files in `docker/dozor/` have distinct roles:
 
 - `dozor.demo.yaml`: local demonstration config used by the Docker image in this repository
 - `dozor.reference.yaml`: production-like reference config intended as a starting point for embedding Dozor into another project stack
+
+After changing `.env` or the demo config, restart the local stack:
+
+```bash
+make compose-down
+make compose-up
+```
 
 See `docs/local-compose-setup.md`.
 
@@ -284,12 +308,15 @@ Note:
 - No UI
 - No AI-based alert decisions
 - No distributed coordination
+- No degraded alerts by default
+- No full error analysis platform or Sentry replacement
 
 The focus of v0.1 is deterministic correctness.
 
 ## Status
 
-This project is currently in early architectural phase.
+This project is currently in late `v0.1` stabilization, with the core runtime and demo
+flow already operational.
 
 The goal of v0.1 is to establish:
 
