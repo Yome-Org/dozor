@@ -250,6 +250,11 @@ Configuration files in `docker/dozor/` have distinct roles:
 - `dozor.demo.yaml`: local demonstration config used by the Docker image in this repository
 - `dozor.reference.yaml`: production-like reference config intended as a starting point for embedding Dozor into another project stack
 
+Container build files in `docker/dozor/` also have distinct roles:
+
+- `Dockerfile.demo`: local compose image with embedded demo config
+- `Dockerfile`: publishable runtime image that expects `DOZOR_CONFIG` to point to a mounted config file
+
 After changing `.env` or the demo config, restart the local stack:
 
 ```bash
@@ -258,6 +263,37 @@ make compose-up
 ```
 
 See `docs/local-compose-setup.md`.
+
+## Container Image
+
+The publishable container image is intended to run with:
+
+- a mounted configuration file
+- `DOZOR_CONFIG` pointing to that file
+- deployment-specific environment variables for API, Postgres, Redis, and Telegram
+
+Example:
+
+```bash
+docker run --rm \
+  -p 8080:8080 \
+  -e DOZOR_CONFIG=/config/dozor.yaml \
+  -e API_HOST=0.0.0.0 \
+  -e API_PORT=8080 \
+  -e POSTGRES_JDBC_URL=jdbc:postgresql://postgres:5432/dozor \
+  -e POSTGRES_USERNAME=dozor \
+  -e POSTGRES_PASSWORD=dozor \
+  -e REDIS_ENABLED=true \
+  -e REDIS_URI=redis://redis:6379 \
+  -e TELEGRAM_ENABLED=false \
+  -v $(pwd)/docker/dozor/dozor.reference.yaml:/config/dozor.yaml:ro \
+  ghcr.io/yome-org/dozor:latest
+```
+
+Container publishing is split into:
+
+- preview images for branch work
+- release images for version tags
 
 ## Code Style
 

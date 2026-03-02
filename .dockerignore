@@ -1,0 +1,10 @@
+.git
+.github
+.gradle
+build
+out
+.idea
+*.iml
+.env
+docker/mock-health/__pycache__
+docker/mock-health/*.pyc
