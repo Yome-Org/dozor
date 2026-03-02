@@ -27,6 +27,9 @@ the dependency graph and thresholds unchanged but shortens `incident_threshold` 
 The repository also contains `docker/dozor/dozor.reference.yaml` as a production-like
 reference configuration for embedding Dozor into another project stack.
 
+The local compose stack builds `docker/dozor/Dockerfile.demo`, not the publishable
+runtime image used for registry releases.
+
 ## Start
 
 Prepare environment:

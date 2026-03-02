@@ -33,7 +33,7 @@ services:
   dozor:
     build:
       context: ..
-      dockerfile: docker/dozor/Dockerfile
+      dockerfile: docker/dozor/Dockerfile.demo
     env_file:
       - ../.env
     depends_on:
