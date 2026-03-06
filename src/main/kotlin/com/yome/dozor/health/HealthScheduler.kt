@@ -74,7 +74,9 @@ class HealthScheduler(
     }
 
     if (diagnosticLogs && result.healthy && previousFailures > 0) {
-      println("health-check ok component=${check.component} url=${check.url} details=${result.details}")
+      println(
+        "health-check ok component=${check.component} url=${check.url} details=${result.details}"
+      )
     }
 
     if (ingestion.status == SignalIngestionStatus.BACKPRESSURE) {

@@ -116,5 +116,6 @@ class DeterministicEvaluationEngine(
       }
       .toSet()
 
-  private fun componentName(componentId: ComponentId): String = componentNamesById[componentId] ?: "unknown"
+  private fun componentName(componentId: ComponentId): String =
+    componentNamesById[componentId] ?: "unknown"
 }

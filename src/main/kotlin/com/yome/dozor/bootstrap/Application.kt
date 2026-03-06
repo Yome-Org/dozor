@@ -208,7 +208,9 @@ fun main() {
 
   if (config.runtime.diagnosticLogs) {
     edges.forEach { edge ->
-      logger.info("Dozor dependency: ${componentNamesById[edge.upstream]} -> ${componentNamesById[edge.downstream]}")
+      logger.info(
+        "Dozor dependency: ${componentNamesById[edge.upstream]} -> ${componentNamesById[edge.downstream]}"
+      )
     }
     healthChecks.forEach { check ->
       logger.info(

@@ -66,5 +66,6 @@ class DeterministicIncidentEngine(
     return IncidentTransition(opened = opened, resolved = resolved)
   }
 
-  private fun componentName(componentId: ComponentId): String = componentNamesById[componentId] ?: "unknown"
+  private fun componentName(componentId: ComponentId): String =
+    componentNamesById[componentId] ?: "unknown"
 }

@@ -34,23 +34,25 @@ class SignalIngestionService(
     val componentId =
       componentByName[componentName]
         ?: return SignalIngestionResult(
-          SignalIngestionStatus.UNKNOWN_COMPONENT,
+            SignalIngestionStatus.UNKNOWN_COMPONENT,
+            runtimeLoop.queueUtilization()
+          )
+          .also { result ->
+            if (diagnosticLogs) {
+              logIngestion(componentName, severity, source, occurredAt, result)
+            }
+          }
+
+    if (!runtimeLoop.canAccept()) {
+      return SignalIngestionResult(
+          SignalIngestionStatus.BACKPRESSURE,
           runtimeLoop.queueUtilization()
-        ).also { result ->
+        )
+        .also { result ->
           if (diagnosticLogs) {
             logIngestion(componentName, severity, source, occurredAt, result)
           }
         }
-
-    if (!runtimeLoop.canAccept()) {
-      return SignalIngestionResult(
-        SignalIngestionStatus.BACKPRESSURE,
-        runtimeLoop.queueUtilization()
-      ).also { result ->
-        if (diagnosticLogs) {
-          logIngestion(componentName, severity, source, occurredAt, result)
-        }
-      }
     }
 
     val signal = Signal(componentId = componentId, severity = severity, occurredAt = occurredAt)
