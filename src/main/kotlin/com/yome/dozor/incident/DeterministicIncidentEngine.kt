@@ -6,7 +6,10 @@ import com.yome.dozor.propagation.DependencyGraph
 import java.time.Instant
 import java.util.UUID
 
-class DeterministicIncidentEngine : IncidentEngine {
+class DeterministicIncidentEngine(
+  private val diagnosticLogs: Boolean = false,
+  private val componentNamesById: Map<ComponentId, String> = emptyMap(),
+) : IncidentEngine {
   override fun detectTransitions(
     previousStates: Map<ComponentId, ComponentState>,
     currentStates: Map<ComponentId, ComponentState>,
@@ -28,7 +31,7 @@ class DeterministicIncidentEngine : IncidentEngine {
       val transitionedToCritical =
         previous != ComponentState.CRITICAL && current == ComponentState.CRITICAL
       if (transitionedToCritical && isRoot && componentId !in activeIncidents) {
-        opened +=
+        val incident =
           Incident(
             id = UUID.randomUUID(),
             rootComponentId = componentId,
@@ -36,18 +39,32 @@ class DeterministicIncidentEngine : IncidentEngine {
             resolvedAt = null,
             status = IncidentStatus.OPEN,
           )
+        opened += incident
+        if (diagnosticLogs) {
+          println(
+            "incident-open component=${componentName(componentId)} componentId=$componentId incidentId=${incident.id} previous=$previous current=$current",
+          )
+        }
       }
 
       val activeIncident = activeIncidents[componentId]
       if (activeIncident != null && current != ComponentState.CRITICAL) {
-        resolved +=
+        val resolvedIncident =
           activeIncident.copy(
             resolvedAt = now,
             status = IncidentStatus.RESOLVED,
           )
+        resolved += resolvedIncident
+        if (diagnosticLogs) {
+          println(
+            "incident-resolved component=${componentName(componentId)} componentId=$componentId incidentId=${activeIncident.id} previous=$previous current=$current",
+          )
+        }
       }
     }
 
     return IncidentTransition(opened = opened, resolved = resolved)
   }
+
+  private fun componentName(componentId: ComponentId): String = componentNamesById[componentId] ?: "unknown"
 }

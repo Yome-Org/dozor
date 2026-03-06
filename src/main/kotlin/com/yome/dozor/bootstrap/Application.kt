@@ -56,6 +56,7 @@ fun main() {
   val components =
     config.components.map { c -> Component(id = stableComponentId(c.name), name = c.name) }
   val componentByName = components.associateBy { it.name }
+  val componentNamesById = components.associate { it.id to it.name }
 
   val edges =
     config.dependencies.map { d ->
@@ -134,7 +135,13 @@ fun main() {
       alertPublisher = alertPublisher,
       stateEvaluator = DeterministicStateEvaluator(),
       propagationEngine = DeterministicPropagationEngine(),
-      incidentEngine = DeterministicIncidentEngine(),
+      incidentEngine =
+        DeterministicIncidentEngine(
+          diagnosticLogs = config.runtime.diagnosticLogs,
+          componentNamesById = componentNamesById,
+        ),
+      diagnosticLogs = config.runtime.diagnosticLogs,
+      componentNamesById = componentNamesById,
     )
 
   val runtimeLoop =
@@ -152,6 +159,7 @@ fun main() {
       repository = signalRepository,
       temporalBucketStore = temporalBucketStore,
       runtimeLoop = runtimeLoop,
+      diagnosticLogs = config.runtime.diagnosticLogs,
     )
 
   val healthChecks =
@@ -172,7 +180,12 @@ fun main() {
         contentTypeContains = check.contentTypeContains,
       )
     }
-  val healthScheduler = HealthScheduler(healthChecks, ingestion)
+  val healthScheduler =
+    HealthScheduler(
+      checks = healthChecks,
+      ingestionService = ingestion,
+      diagnosticLogs = config.runtime.diagnosticLogs,
+    )
   healthScheduler.start()
 
   logger.info(
@@ -186,11 +199,23 @@ fun main() {
       append(", postgres=").append(config.postgres.jdbcUrl)
       append(", redisEnabled=").append(config.redis.enabled)
       append(", telegramEnabled=").append(config.telegram.enabled)
+      append(", diagnosticLogs=").append(config.runtime.diagnosticLogs)
       append(", components=").append(components.size)
       append(", dependencies=").append(edges.size)
       append(", checks=").append(healthChecks.size)
     }
   )
+
+  if (config.runtime.diagnosticLogs) {
+    edges.forEach { edge ->
+      logger.info("Dozor dependency: ${componentNamesById[edge.upstream]} -> ${componentNamesById[edge.downstream]}")
+    }
+    healthChecks.forEach { check ->
+      logger.info(
+        "Dozor check: component=${check.component} type=${check.type} url=${check.url} interval=${check.interval} timeout=${check.timeout} failureThreshold=${check.failureThreshold} expectedStatus=${check.expectedStatus} bodyContains=${check.bodyContains != null} contentTypeContains=${check.contentTypeContains != null}",
+      )
+    }
+  }
 
   Runtime.getRuntime()
     .addShutdownHook(

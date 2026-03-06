@@ -2,6 +2,7 @@ package com.yome.dozor.engine
 
 import com.yome.dozor.domain.ComponentId
 import com.yome.dozor.domain.ComponentState
+import com.yome.dozor.domain.Severity
 import com.yome.dozor.incident.IncidentEngine
 import com.yome.dozor.propagation.DependencyGraph
 import com.yome.dozor.propagation.PropagationEngine
@@ -18,6 +19,8 @@ class DeterministicEvaluationEngine(
   private val stateEvaluator: StateEvaluator,
   private val propagationEngine: PropagationEngine,
   private val incidentEngine: IncidentEngine,
+  private val diagnosticLogs: Boolean = false,
+  private val componentNamesById: Map<ComponentId, String> = emptyMap(),
 ) : EvaluationEngine {
   override fun evaluate(
     dirtyComponents: Set<ComponentId>,
@@ -30,18 +33,42 @@ class DeterministicEvaluationEngine(
     for (componentId in dirtyComponents.sortedBy { it.toString() }) {
       val signals = signalRepository.findByComponent(componentId)
       val previousState = isolated[componentId] ?: ComponentState.UNKNOWN
+      val thresholdConfig = thresholdProvider.configFor(componentId)
       val evaluated =
         stateEvaluator.evaluate(
           signals = signals,
           previousState = previousState,
-          config = thresholdProvider.configFor(componentId),
+          config = thresholdConfig,
           now = now,
         )
       isolated[componentId] = evaluated
       isolatedChanged[componentId] = evaluated
+
+      if (diagnosticLogs && previousState != evaluated) {
+        val windowStart = now.minus(thresholdConfig.window)
+        val windowSignals =
+          signals.filter { !it.occurredAt.isAfter(now) && !it.occurredAt.isBefore(windowStart) }
+        val criticalCount = windowSignals.count { it.severity == Severity.CRITICAL }
+        val warningCount = windowSignals.count { it.severity == Severity.WARNING }
+        println(
+          "state-transition scope=isolated component=${componentName(componentId)} componentId=$componentId previous=$previousState current=$evaluated windowSignals=${windowSignals.size} criticalCount=$criticalCount warningCount=$warningCount criticalThreshold=${thresholdConfig.criticalThreshold} degradedThreshold=${thresholdConfig.degradedThreshold}",
+        )
+      }
     }
 
     val effective = propagationEngine.propagate(isolated.withUnknownDefaults(graph), graph)
+    if (diagnosticLogs) {
+      val changedEffective =
+        effective.filter { (componentId, state) ->
+          (previousEffective[componentId] ?: ComponentState.UNKNOWN) != state
+        }
+      for ((componentId, state) in changedEffective) {
+        val previous = previousEffective[componentId] ?: ComponentState.UNKNOWN
+        println(
+          "state-transition scope=effective component=${componentName(componentId)} componentId=$componentId previous=$previous current=$state",
+        )
+      }
+    }
     val transition =
       incidentEngine.detectTransitions(
         previousStates = previousEffective,
@@ -88,4 +115,6 @@ class DeterministicEvaluationEngine(
           graph.allUpstreamOf(componentId).none { states[it] == ComponentState.CRITICAL }
       }
       .toSet()
+
+  private fun componentName(componentId: ComponentId): String = componentNamesById[componentId] ?: "unknown"
 }

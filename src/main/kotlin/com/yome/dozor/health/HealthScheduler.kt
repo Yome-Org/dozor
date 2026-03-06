@@ -14,6 +14,7 @@ class HealthScheduler(
   private val ingestionService: SignalIngestionService,
   private val executor: HealthCheckExecutor = HttpHealthCheck(),
   private val clock: Clock = Clock.systemUTC(),
+  private val diagnosticLogs: Boolean = false,
 ) {
   private val scheduler: ScheduledExecutorService = Executors.newScheduledThreadPool(1)
   private val workers = Executors.newFixedThreadPool(4)
@@ -41,6 +42,7 @@ class HealthScheduler(
         HealthCheckType.HTTP -> executor.execute(check)
       }
 
+    val previousFailures = consecutiveFailures[check.component] ?: 0
     val failures =
       if (result.healthy) {
         consecutiveFailures[check.component] = 0
@@ -64,6 +66,16 @@ class HealthScheduler(
         source = "health-check",
         idempotencyKey = null,
       )
+
+    if (diagnosticLogs && !result.healthy) {
+      println(
+        "health-check failed component=${check.component} url=${check.url} failures=$failures failureThreshold=${check.failureThreshold} severity=$severity details=${result.details}",
+      )
+    }
+
+    if (diagnosticLogs && result.healthy && previousFailures > 0) {
+      println("health-check ok component=${check.component} url=${check.url} details=${result.details}")
+    }
 
     if (ingestion.status == SignalIngestionStatus.BACKPRESSURE) {
       println("health-check dropped by backpressure component=${check.component}")
