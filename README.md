@@ -47,6 +47,8 @@ dozor/
  ├── settings.gradle.kts
  ├── docs/
  │    └── adr/
+ ├── packages/
+ │    └── dozor-sdk/   # JS/TS SDK for signal ingestion
  ├── docker/
  ├── src/
  │    ├── main/kotlin/com/yome/dozor/

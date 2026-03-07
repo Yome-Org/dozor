@@ -18,3 +18,7 @@ __pycache__/
 .env
 .env.*
 !.env.example
+
+# Node package artifacts
+node_modules/
+dist/
