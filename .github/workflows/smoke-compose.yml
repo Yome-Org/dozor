@@ -20,12 +20,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Prepare env
+        id: prepare_env
         run: cp .env.example .env
 
       - name: Start stack
+        id: start_stack
         run: docker compose --env-file .env -f docker/compose.yaml up --build -d
 
       - name: Wait for Dozor API
+        id: wait_api
         run: |
           for i in {1..60}; do
             if bash -c '</dev/tcp/127.0.0.1/8080' 2>/dev/null; then
@@ -37,9 +40,11 @@ jobs:
           exit 1
 
       - name: Trigger failure
+        id: trigger_failure
         run: curl -fsS "http://localhost:18080/toggle?healthy=false"
 
       - name: Wait for incident opening
+        id: wait_incident
         run: |
           for i in {1..30}; do
             count="$(
@@ -58,11 +63,13 @@ jobs:
           exit 1
 
       - name: Assert open incident exists
+        id: assert_incident
         run: |
           docker exec $(docker ps -qf name=postgres) \
             psql -U dozor -d dozor -c "SELECT id, root_component_id, started_at, status FROM incidents WHERE status = 0 ORDER BY started_at DESC;"
 
       - name: Show state snapshot
+        id: state_snapshot
         if: always()
         run: |
           docker exec $(docker ps -qf name=postgres) \
@@ -70,6 +77,7 @@ jobs:
             -c "SELECT component_id, state, last_evaluated_at, version FROM component_state ORDER BY last_evaluated_at DESC;"
 
       - name: Show incidents snapshot
+        id: incidents_snapshot
         if: always()
         run: |
           docker exec $(docker ps -qf name=postgres) \
@@ -77,9 +85,40 @@ jobs:
             -c "SELECT id, root_component_id, started_at, resolved_at, status FROM incidents ORDER BY started_at DESC LIMIT 20;"
 
       - name: Show service logs
+        id: logs
         if: always()
         run: docker compose --env-file .env -f docker/compose.yaml logs dozor postgres redis mock-health
 
       - name: Stop stack
+        id: stop_stack
         if: always()
         run: docker compose --env-file .env -f docker/compose.yaml down -v
+
+      - name: Job summary
+        if: always()
+        run: |
+          status_emoji() {
+            case "$1" in
+              success) echo "✅";;
+              failure) echo "❌";;
+              cancelled) echo "⚪";;
+              skipped) echo "⏭️";;
+              *) echo "❔";;
+            esac
+          }
+
+          {
+            echo "## Smoke Compose Summary"
+            echo ""
+            echo "- Ref: \`${GITHUB_REF_NAME}\`"
+            echo "- Prepare env: $(status_emoji "${{ steps.prepare_env.outcome }}") \`${{ steps.prepare_env.outcome }}\`"
+            echo "- Start stack: $(status_emoji "${{ steps.start_stack.outcome }}") \`${{ steps.start_stack.outcome }}\`"
+            echo "- Wait API: $(status_emoji "${{ steps.wait_api.outcome }}") \`${{ steps.wait_api.outcome }}\`"
+            echo "- Trigger failure: $(status_emoji "${{ steps.trigger_failure.outcome }}") \`${{ steps.trigger_failure.outcome }}\`"
+            echo "- Wait incident open: $(status_emoji "${{ steps.wait_incident.outcome }}") \`${{ steps.wait_incident.outcome }}\`"
+            echo "- Assert incident: $(status_emoji "${{ steps.assert_incident.outcome }}") \`${{ steps.assert_incident.outcome }}\`"
+            echo "- State snapshot: $(status_emoji "${{ steps.state_snapshot.outcome }}") \`${{ steps.state_snapshot.outcome }}\`"
+            echo "- Incidents snapshot: $(status_emoji "${{ steps.incidents_snapshot.outcome }}") \`${{ steps.incidents_snapshot.outcome }}\`"
+            echo "- Service logs: $(status_emoji "${{ steps.logs.outcome }}") \`${{ steps.logs.outcome }}\`"
+            echo "- Stop stack: $(status_emoji "${{ steps.stop_stack.outcome }}") \`${{ steps.stop_stack.outcome }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

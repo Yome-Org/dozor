@@ -40,6 +40,7 @@ jobs:
           echo "value=$VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Validate package version
+        id: validate_version
         run: |
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
           TAG_VERSION="${{ steps.version.outputs.value }}"
@@ -49,21 +50,72 @@ jobs:
           fi
 
       - name: Install
+        id: install
         run: npm ci
 
       - name: Lint and format check
+        id: check
         run: npm run check
 
       - name: Typecheck
+        id: typecheck
         run: npm run typecheck
 
       - name: Test with coverage thresholds
+        id: test_coverage
         run: npm run test:coverage
 
       - name: Build
+        id: build
         run: npm run build
 
       - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        id: publish
         run: npm publish --access public --provenance
+
+      - name: Job summary
+        if: always()
+        working-directory: .
+        run: |
+          status_emoji() {
+            case "$1" in
+              success) echo "✅";;
+              failure) echo "❌";;
+              cancelled) echo "⚪";;
+              skipped) echo "⏭️";;
+              *) echo "❔";;
+            esac
+          }
+
+          cov_file="packages/dozor-sdk/coverage/coverage-summary.json"
+          if [ -f "$cov_file" ]; then
+            statements="$(node -e "const c=require('./$cov_file').total.statements; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
+            branches="$(node -e "const c=require('./$cov_file').total.branches; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
+            functions="$(node -e "const c=require('./$cov_file').total.functions; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
+            lines="$(node -e "const c=require('./$cov_file').total.lines; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
+          else
+            statements="n/a"
+            branches="n/a"
+            functions="n/a"
+            lines="n/a"
+          fi
+
+          {
+            echo "## SDK JS Publish Summary"
+            echo ""
+            echo "- Tag: \`${GITHUB_REF_NAME}\`"
+            echo "- Release version from tag: \`${{ steps.version.outputs.value }}\`"
+            echo "- Version validation: $(status_emoji "${{ steps.validate_version.outcome }}") \`${{ steps.validate_version.outcome }}\`"
+            echo "- Install: $(status_emoji "${{ steps.install.outcome }}") \`${{ steps.install.outcome }}\`"
+            echo "- Lint/Format: $(status_emoji "${{ steps.check.outcome }}") \`${{ steps.check.outcome }}\`"
+            echo "- Typecheck: $(status_emoji "${{ steps.typecheck.outcome }}") \`${{ steps.typecheck.outcome }}\`"
+            echo "- Tests + Coverage: $(status_emoji "${{ steps.test_coverage.outcome }}") \`${{ steps.test_coverage.outcome }}\`"
+            echo "- Build: $(status_emoji "${{ steps.build.outcome }}") \`${{ steps.build.outcome }}\`"
+            echo "- Publish: $(status_emoji "${{ steps.publish.outcome }}") \`${{ steps.publish.outcome }}\`"
+            echo ""
+            echo "### Coverage"
+            echo "- Statements: ${statements} (threshold: 90%)"
+            echo "- Branches: ${branches} (threshold: 85%)"
+            echo "- Functions: ${functions} (threshold: 90%)"
+            echo "- Lines: ${lines} (threshold: 90%)"
+          } >> "$GITHUB_STEP_SUMMARY"
