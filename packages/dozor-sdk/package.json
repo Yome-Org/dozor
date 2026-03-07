@@ -1,0 +1,41 @@
+{
+  "name": "@yome-network/dozor-sdk",
+  "version": "0.1.0",
+  "description": "Typed SDK for Dozor signal ingestion API with runtime validation and pluggable transports.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsup src/index.ts --dts --format esm,cjs --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "check": "biome check .",
+    "check:fix": "biome check . --write"
+  },
+  "keywords": ["dozor", "sdk", "signal", "monitoring"],
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@vitest/coverage-v8": "^2.1.9",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8",
+    "@biomejs/biome": "^1.9.4"
+  }
+}

@@ -1,0 +1,69 @@
+name: SDK JS Publish
+
+on:
+  push:
+    tags:
+      - 'sdk-v*'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/dozor-sdk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: packages/dozor-sdk/package-lock.json
+
+      - name: Resolve release version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="${TAG#sdk-v}"
+          if [ "$VERSION" = "$TAG" ] || [ -z "$VERSION" ]; then
+            echo "Tag must match sdk-v<version>, got: $TAG" >&2
+            exit 1
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Validate package version
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          TAG_VERSION="${{ steps.version.outputs.value }}"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: package.json=$PACKAGE_VERSION tag=$TAG_VERSION" >&2
+            exit 1
+          fi
+
+      - name: Install
+        run: npm ci
+
+      - name: Lint and format check
+        run: npm run check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test with coverage thresholds
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public --provenance
