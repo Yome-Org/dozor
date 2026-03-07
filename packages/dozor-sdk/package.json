@@ -1,6 +1,6 @@
 {
   "name": "@yome-network/dozor-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Typed SDK for Dozor signal ingestion API with runtime validation and pluggable transports.",
   "type": "module",
   "main": "./dist/index.cjs",
