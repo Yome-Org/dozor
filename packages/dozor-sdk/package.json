@@ -33,10 +33,10 @@
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^4.0.18",
     "tsup": "^8.3.5",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8",
+    "vitest": "^4.0.18",
     "@biomejs/biome": "^1.9.4"
   }
 }
