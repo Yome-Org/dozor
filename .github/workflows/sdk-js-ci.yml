@@ -33,16 +33,75 @@ jobs:
           cache-dependency-path: packages/dozor-sdk/package-lock.json
 
       - name: Install
+        id: install
         run: npm ci
 
       - name: Typecheck
+        id: typecheck
         run: npm run typecheck
 
       - name: Lint and format check
+        id: check
         run: npm run check
 
       - name: Test with coverage thresholds
+        id: test_coverage
         run: npm run test:coverage
 
       - name: Build
+        id: build
         run: npm run build
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdk-js-coverage
+          path: packages/dozor-sdk/coverage
+          if-no-files-found: ignore
+
+      - name: Job summary
+        if: always()
+        working-directory: .
+        run: |
+          status_emoji() {
+            case "$1" in
+              success) echo "✅";;
+              failure) echo "❌";;
+              cancelled) echo "⚪";;
+              skipped) echo "⏭️";;
+              *) echo "❔";;
+            esac
+          }
+
+          cov_file="packages/dozor-sdk/coverage/coverage-summary.json"
+          if [ -f "$cov_file" ]; then
+            statements="$(node -e "const c=require('./$cov_file').total.statements; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
+            branches="$(node -e "const c=require('./$cov_file').total.branches; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
+            functions="$(node -e "const c=require('./$cov_file').total.functions; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
+            lines="$(node -e "const c=require('./$cov_file').total.lines; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
+          else
+            statements="n/a"
+            branches="n/a"
+            functions="n/a"
+            lines="n/a"
+          fi
+
+          {
+            echo "## SDK JS CI Summary"
+            echo ""
+            echo "- Branch/Ref: \`${GITHUB_REF_NAME}\`"
+            echo "- Install: $(status_emoji "${{ steps.install.outcome }}") \`${{ steps.install.outcome }}\`"
+            echo "- Typecheck: $(status_emoji "${{ steps.typecheck.outcome }}") \`${{ steps.typecheck.outcome }}\`"
+            echo "- Lint/Format: $(status_emoji "${{ steps.check.outcome }}") \`${{ steps.check.outcome }}\`"
+            echo "- Tests + Coverage: $(status_emoji "${{ steps.test_coverage.outcome }}") \`${{ steps.test_coverage.outcome }}\`"
+            echo "- Build: $(status_emoji "${{ steps.build.outcome }}") \`${{ steps.build.outcome }}\`"
+            echo ""
+            echo "### Coverage"
+            echo "- Statements: ${statements} (threshold: 90%)"
+            echo "- Branches: ${branches} (threshold: 85%)"
+            echo "- Functions: ${functions} (threshold: 90%)"
+            echo "- Lines: ${lines} (threshold: 90%)"
+            echo ""
+            echo "Coverage artifact: \`sdk-js-coverage\`"
+          } >> "$GITHUB_STEP_SUMMARY"

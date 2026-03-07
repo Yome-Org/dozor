@@ -6,7 +6,7 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
-      reporter: ["text", "html"],
+      reporter: ["text", "html", "json-summary"],
       thresholds: {
         statements: 90,
         branches: 85,

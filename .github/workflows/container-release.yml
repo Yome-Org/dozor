@@ -45,6 +45,7 @@ jobs:
             org.opencontainers.image.description=Dozor deterministic state evaluation engine
 
       - name: Build and push release image
+        id: build
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -54,3 +55,29 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Job summary
+        if: always()
+        run: |
+          status_emoji() {
+            case "$1" in
+              success) echo "✅";;
+              failure) echo "❌";;
+              cancelled) echo "⚪";;
+              skipped) echo "⏭️";;
+              *) echo "❔";;
+            esac
+          }
+
+          {
+            echo "## Container Release Summary"
+            echo ""
+            echo "- Tag: \`${GITHUB_REF_NAME}\`"
+            echo "- Image: \`${{ steps.image.outputs.name }}\`"
+            echo "- Build & push: $(status_emoji "${{ steps.build.outcome }}") \`${{ steps.build.outcome }}\`"
+            echo ""
+            echo "### Published tags"
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

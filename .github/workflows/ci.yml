@@ -28,12 +28,39 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Check formatting
+        id: spotless
         run: ./gradlew spotlessCheck --no-daemon
 
       - name: Run tests
+        id: tests
         run: ./gradlew test --no-daemon
 
       - name: Validate docker compose config
+        id: compose_config
         run: |
           cp .env.example .env
           docker compose --env-file .env -f docker/compose.yaml config
+
+      - name: Job summary
+        if: always()
+        run: |
+          status_emoji() {
+            case "$1" in
+              success) echo "✅";;
+              failure) echo "❌";;
+              cancelled) echo "⚪";;
+              skipped) echo "⏭️";;
+              *) echo "❔";;
+            esac
+          }
+
+          {
+            echo "## CI Summary"
+            echo ""
+            echo "- Ref: \`${GITHUB_REF_NAME}\`"
+            echo "- Spotless check: $(status_emoji "${{ steps.spotless.outcome }}") \`${{ steps.spotless.outcome }}\`"
+            echo "- Kotlin/JVM tests: $(status_emoji "${{ steps.tests.outcome }}") \`${{ steps.tests.outcome }}\`"
+            echo "- Docker compose validation: $(status_emoji "${{ steps.compose_config.outcome }}") \`${{ steps.compose_config.outcome }}\`"
+            echo ""
+            echo "Coverage metrics are not collected in this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
