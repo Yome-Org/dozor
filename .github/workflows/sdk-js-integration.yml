@@ -1,0 +1,84 @@
+name: SDK JS Integration
+
+on:
+  workflow_dispatch:
+    inputs:
+      known_component:
+        description: "Optional known Dozor component name for accepted-response test"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  sdk-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/dozor-sdk/package-lock.json
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Start Dozor stack
+        run: docker compose --env-file .env -f docker/compose.yaml up --build -d
+
+      - name: Wait for Dozor API port
+        run: |
+          for i in {1..90}; do
+            if bash -c '</dev/tcp/127.0.0.1/8080' 2>/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Dozor API port did not open in time"
+          exit 1
+
+      - name: Wait for Dozor /signal readiness
+        run: |
+          for i in {1..90}; do
+            status_code="$(
+              curl -sS -o /tmp/dozor-ready.json -w "%{http_code}" \
+                -H 'content-type: application/json' \
+                -X POST http://localhost:8080/signal \
+                -d '{"component":"sdk-ci-unknown-component","severity":"WARNING","source":"sdk-ci-readiness","occurredAt":"2026-01-01T00:00:00.000Z"}'
+            )"
+
+            if [ "$status_code" = "404" ] || [ "$status_code" = "400" ] || [ "$status_code" = "429" ] || [ "$status_code" = "200" ] || [ "$status_code" = "202" ]; then
+              exit 0
+            fi
+
+            sleep 2
+          done
+          echo "Dozor /signal did not become ready in time"
+          cat /tmp/dozor-ready.json || true
+          exit 1
+
+      - name: Install SDK dependencies
+        working-directory: packages/dozor-sdk
+        run: npm ci
+
+      - name: Run SDK integration tests
+        working-directory: packages/dozor-sdk
+        env:
+          DOZOR_INTEGRATION_BASE_URL: http://localhost:8080
+          DOZOR_INTEGRATION_COMPONENT: ${{ github.event.inputs.known_component }}
+        run: npm run test:integration
+
+      - name: Show service logs
+        if: always()
+        run: docker compose --env-file .env -f docker/compose.yaml logs dozor postgres redis mock-health
+
+      - name: Stop stack
+        if: always()
+        run: docker compose --env-file .env -f docker/compose.yaml down -v

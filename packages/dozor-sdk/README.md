@@ -1,6 +1,6 @@
 # @yome-network/dozor-sdk
 
-Typed SDK for Dozor signal ingestion API (`POST /signal`) with runtime validation and pluggable transports.
+Typed SDK for Dozor signal ingestion API (`POST /signal`) with runtime validation, normalized error model, and pluggable transports.
 
 ## Install
 
@@ -8,74 +8,112 @@ Typed SDK for Dozor signal ingestion API (`POST /signal`) with runtime validatio
 npm install @yome-network/dozor-sdk
 ```
 
-## Usage
+## Quick Start
 
 ```ts
-import { createDozorClient, HttpDozorTransport } from '@yome-network/dozor-sdk'
+import { createDozorClient, HttpDozorTransport } from "@yome-network/dozor-sdk";
 
 const client = createDozorClient({
-  transport: new HttpDozorTransport({ baseUrl: 'http://your-dozor-host:3008' }),
-})
+  transport: new HttpDozorTransport({ baseUrl: "http://your-dozor-host:3008" }),
+});
 
 const result = await client.sendSignal({
-  component: 'catalog',
-  severity: 'WARNING',
-  source: 'runtime-error:read-model',
+  component: "catalog",
+  severity: "WARNING",
+  source: "runtime-error:read-model",
   occurredAt: new Date().toISOString(),
-  idempotencyKey: 'catalog:runtime:warning:12345',
-})
+  idempotencyKey: "catalog:runtime:warning:12345",
+});
 
 if (!result.ok) {
-  console.warn('signal rejected', result.httpStatus, result.body)
+  console.warn("signal rejected", result.httpStatus, result.body);
 }
 ```
 
-## API
+## What `sendSignal` Guarantees
 
-- `DozorClient#sendSignal(payload)`
-  - validates request payload
-  - sends signal through configured transport
-  - validates response payload
-  - returns typed result for statuses `200`, `202`, `400`, `404`, `429`
-  - throws `DozorProtocolError` for unexpected status/schema
-  - throws `DozorTransportError` for transport-level failures
-  - throws `DozorValidationError` for invalid request payload
+`DozorClient#sendSignal(payload, options?)`:
+- validates request payload before sending
+- sends through configured transport
+- validates response schema after receiving
+- returns typed result for `200`, `202`, `400`, `404`, `429`
+- throws normalized typed errors:
+  - `DozorValidationError`
+  - `DozorTransportError`
+  - `DozorProtocolError`
 
-## Transport extensibility
+## Retry Policy
 
-The client accepts a generic `DozorTransport` implementation.
+Global retry policy:
 
-Current implementation:
+```ts
+const client = createDozorClient({
+  transport: new HttpDozorTransport({ baseUrl: "http://localhost:3008" }),
+  retryPolicy: {
+    maxAttempts: 3,
+    baseDelayMs: 100,
+    maxDelayMs: 1_000,
+    backoffMultiplier: 2,
+  },
+});
+```
+
+Per-call override:
+
+```ts
+await client.sendSignal(payload, {
+  retryPolicy: { maxAttempts: 5 },
+});
+```
+
+## Observability Hooks and Logger
+
+```ts
+const client = createDozorClient({
+  transport: new HttpDozorTransport({ baseUrl: "http://localhost:3008" }),
+  hooks: {
+    onRequest: ({ redactedRequest, attempt }) => {
+      console.info("dozor request", { redactedRequest, attempt });
+    },
+    onResponse: ({ responseStatus, result }) => {
+      console.info("dozor response", { responseStatus, ok: result.ok });
+    },
+    onError: ({ error, willRetry }) => {
+      console.error("dozor error", { error, willRetry });
+    },
+  },
+  logger: {
+    warn: (message, context) => console.warn(message, context),
+    debug: (message, context) => console.debug(message, context),
+  },
+  redaction: {
+    fields: ["idempotencyKey"],
+    replacement: "[REDACTED]",
+  },
+});
+```
+
+## Transport Extensibility
+
+The client works with any transport implementing `DozorTransport`.
+
+Included now:
 - `HttpDozorTransport`
 
-Planned implementations:
-- MQ transport
-- WebSocket transport
+Planned extensions:
+- `MqTransport`
+- `WsTransport`
 
-## Integration Example
+## Local Integration Tests
 
-1. Create a singleton SDK client:
-
-```ts
-const dozorClient = createDozorClient({
-  transport: new HttpDozorTransport({ baseUrl: config.dozorApiUrl, timeoutMs: 1500 }),
-})
+```bash
+DOZOR_INTEGRATION_BASE_URL=http://localhost:3008 npm run test:integration
 ```
 
-2. Send a signal:
+Optional known component check:
 
-```ts
-const result = await dozorClient.sendSignal({
-  component: 'your-component-name',
-  severity,
-  source,
-  occurredAt,
-  idempotencyKey,
-})
+```bash
+DOZOR_INTEGRATION_BASE_URL=http://localhost:3008 \
+DOZOR_INTEGRATION_COMPONENT=api \
+npm run test:integration
 ```
-
-3. Keep domain-specific behavior in your service layer:
-- feature flags (`DOZOR_ENABLED`)
-- custom metrics
-- cooldown/rate window logic
-- local logging around accepted/rejected statuses
