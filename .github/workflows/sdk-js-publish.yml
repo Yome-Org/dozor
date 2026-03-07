@@ -103,6 +103,13 @@ jobs:
           {
             echo "## SDK JS Publish Summary"
             echo ""
+            echo "### GitHub OIDC Context"
+            echo "- github.repository: \`${GITHUB_REPOSITORY}\`"
+            echo "- github.ref: \`${GITHUB_REF}\`"
+            echo "- github.ref_name: \`${GITHUB_REF_NAME}\`"
+            echo "- github.workflow_ref: \`${GITHUB_WORKFLOW_REF}\`"
+            echo "- github.actor: \`${GITHUB_ACTOR}\`"
+            echo ""
             echo "- Tag: \`${GITHUB_REF_NAME}\`"
             echo "- Release version from tag: \`${{ steps.version.outputs.value }}\`"
             echo "- Version validation: $(status_emoji "${{ steps.validate_version.outcome }}") \`${{ steps.validate_version.outcome }}\`"
