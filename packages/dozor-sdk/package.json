@@ -25,6 +25,14 @@
   },
   "keywords": ["dozor", "sdk", "signal", "monitoring"],
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Yome-Org/dozor"
+  },
+  "homepage": "https://github.com/Yome-Org/dozor/tree/master/packages/dozor-sdk",
+  "bugs": {
+    "url": "https://github.com/Yome-Org/dozor/issues"
+  },
   "engines": {
     "node": ">=18"
   },
