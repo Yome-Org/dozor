@@ -1,5 +1,7 @@
 # @yome-network/dozor-sdk
 
+[![npm version](https://img.shields.io/npm/v/@yome-network/dozor-sdk.svg)](https://www.npmjs.com/package/@yome-network/dozor-sdk)
+
 Typed SDK for Dozor signal ingestion API (`POST /signal`) with runtime validation, normalized error model, and pluggable transports.
 
 ## Install
@@ -117,3 +119,9 @@ DOZOR_INTEGRATION_BASE_URL=http://localhost:3008 \
 DOZOR_INTEGRATION_COMPONENT=api \
 npm run test:integration
 ```
+
+## Release
+
+- Published to npm as `@yome-network/dozor-sdk`.
+- Releases are created from git tags matching `sdk-v*`.
+- Versioning follows Semantic Versioning.
