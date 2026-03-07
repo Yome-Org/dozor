@@ -144,6 +144,7 @@ Required environment variables:
 
 Additional variables used by the local compose setup:
 
+- `DOZOR_DIAGNOSTIC_LOGS` (optional, `true|false`, default `false`)
 - `POSTGRES_DB`
 - `POSTGRES_PORT`
 - `REDIS_PORT`

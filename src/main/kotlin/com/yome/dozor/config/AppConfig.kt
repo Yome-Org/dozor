@@ -29,6 +29,7 @@ data class EvaluationConfig(
 
 data class RuntimeConfig(
   val queueCapacity: Int,
+  val diagnosticLogs: Boolean,
 )
 
 data class ApiConfig(

@@ -66,7 +66,10 @@ class AppConfigLoader {
     )
 
   private fun parseRuntime(map: Map<String, Any?>): RuntimeConfig =
-    RuntimeConfig(queueCapacity = map.requiredInt("queue_capacity"))
+    RuntimeConfig(
+      queueCapacity = map.requiredInt("queue_capacity"),
+      diagnosticLogs = envBoolean("DOZOR_DIAGNOSTIC_LOGS") ?: false,
+    )
 
   private fun parseContext(map: Map<String, Any?>): ContextConfig =
     ContextConfig(

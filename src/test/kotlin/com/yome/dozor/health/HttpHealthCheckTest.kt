@@ -9,6 +9,7 @@ import java.time.Duration
 import java.util.Optional
 import javax.net.ssl.SSLSession
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -103,13 +104,43 @@ class HttpHealthCheckTest {
     assertTrue(result.healthy)
   }
 
+  @Test
+  fun includesExceptionMessageInFailureDetails() {
+    val check =
+      HealthCheck(
+        component = "messenger",
+        type = HealthCheckType.HTTP,
+        url = "http://example/health",
+        interval = Duration.ofSeconds(30),
+        timeout = Duration.ofSeconds(2),
+        failureThreshold = 3,
+      )
+    val executor =
+      HttpHealthCheck(
+        client =
+          StubHttpClient(
+            response = null,
+            error = java.io.IOException("Connection reset"),
+          ),
+      )
+
+    val result = executor.execute(check)
+
+    assertFalse(result.healthy)
+    assertEquals("IOException: Connection reset", result.details)
+  }
+
   private class StubHttpClient(
-    private val response: HttpResponse<String>,
+    private val response: HttpResponse<String>?,
+    private val error: Exception? = null,
   ) : HttpClient() {
     override fun <T : Any?> send(
       request: HttpRequest?,
       responseBodyHandler: HttpResponse.BodyHandler<T>?,
-    ): HttpResponse<T> = response as HttpResponse<T>
+    ): HttpResponse<T> {
+      error?.let { throw it }
+      return response as HttpResponse<T>
+    }
 
     override fun <T : Any?> sendAsync(
       request: HttpRequest?,

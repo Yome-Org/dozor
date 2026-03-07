@@ -8,7 +8,10 @@ import java.time.Duration
 
 class HttpHealthCheck(
   private val client: HttpClient =
-    HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build(),
+    HttpClient.newBuilder()
+      .connectTimeout(Duration.ofSeconds(3))
+      .version(HttpClient.Version.HTTP_1_1)
+      .build(),
 ) : HealthCheckExecutor {
   override fun execute(check: HealthCheck): HealthCheckResult {
     val request = HttpRequest.newBuilder(URI.create(check.url)).timeout(check.timeout).GET().build()
@@ -38,7 +41,13 @@ class HttpHealthCheck(
             )
           }
         },
-        onFailure = { ex -> HealthCheckResult(healthy = false, details = ex.javaClass.simpleName) },
+        onFailure = { ex ->
+          val message = ex.message?.takeIf { it.isNotBlank() } ?: "no-message"
+          HealthCheckResult(
+            healthy = false,
+            details = "${ex.javaClass.simpleName}: $message",
+          )
+        },
       )
   }
 }

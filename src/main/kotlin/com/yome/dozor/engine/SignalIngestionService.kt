@@ -22,6 +22,7 @@ class SignalIngestionService(
   private val repository: SignalIngestionRepository,
   private val temporalBucketStore: TemporalBucketStore,
   private val runtimeLoop: EvaluationRuntimeLoop,
+  private val diagnosticLogs: Boolean = false,
 ) {
   fun ingest(
     componentName: String,
@@ -33,15 +34,25 @@ class SignalIngestionService(
     val componentId =
       componentByName[componentName]
         ?: return SignalIngestionResult(
-          SignalIngestionStatus.UNKNOWN_COMPONENT,
-          runtimeLoop.queueUtilization()
-        )
+            SignalIngestionStatus.UNKNOWN_COMPONENT,
+            runtimeLoop.queueUtilization()
+          )
+          .also { result ->
+            if (diagnosticLogs) {
+              logIngestion(componentName, severity, source, occurredAt, result)
+            }
+          }
 
     if (!runtimeLoop.canAccept()) {
       return SignalIngestionResult(
-        SignalIngestionStatus.BACKPRESSURE,
-        runtimeLoop.queueUtilization()
-      )
+          SignalIngestionStatus.BACKPRESSURE,
+          runtimeLoop.queueUtilization()
+        )
+        .also { result ->
+          if (diagnosticLogs) {
+            logIngestion(componentName, severity, source, occurredAt, result)
+          }
+        }
     }
 
     val signal = Signal(componentId = componentId, severity = severity, occurredAt = occurredAt)
@@ -53,13 +64,30 @@ class SignalIngestionService(
         idempotencyKey = idempotencyKey,
       )
     ) {
-      SignalAppendResult.DUPLICATE ->
+      SignalAppendResult.DUPLICATE -> {
         SignalIngestionResult(SignalIngestionStatus.DUPLICATE, runtimeLoop.queueUtilization())
+      }
       SignalAppendResult.INSERTED -> {
         temporalBucketStore.add(signal)
         runtimeLoop.submitDirty(componentId)
         SignalIngestionResult(SignalIngestionStatus.ACCEPTED, runtimeLoop.queueUtilization())
       }
+    }.also { result ->
+      if (diagnosticLogs) {
+        logIngestion(componentName, severity, source, occurredAt, result)
+      }
     }
+  }
+
+  private fun logIngestion(
+    componentName: String,
+    severity: Severity,
+    source: String,
+    occurredAt: Instant,
+    result: SignalIngestionResult,
+  ) {
+    println(
+      "signal-ingest component=$componentName severity=$severity source=$source occurredAt=$occurredAt status=${result.status} queueUtilization=${"%.3f".format(result.queueUtilization)}",
+    )
   }
 }
