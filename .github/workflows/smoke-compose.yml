@@ -2,6 +2,11 @@ name: Smoke Compose
 
 on:
   workflow_dispatch:
+    inputs:
+      known_component:
+        description: "Optional known Dozor component name for SDK accepted-response test"
+        required: false
+        default: ""
   push:
     branches:
       - master
@@ -18,6 +23,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: packages/dozor-sdk/package-lock.json
 
       - name: Prepare env
         id: prepare_env
@@ -68,6 +80,19 @@ jobs:
           docker exec $(docker ps -qf name=postgres) \
             psql -U dozor -d dozor -c "SELECT id, root_component_id, started_at, status FROM incidents WHERE status = 0 ORDER BY started_at DESC;"
 
+      - name: Install SDK dependencies
+        id: sdk_install
+        working-directory: packages/dozor-sdk
+        run: npm ci
+
+      - name: Run SDK integration tests
+        id: sdk_integration
+        working-directory: packages/dozor-sdk
+        env:
+          DOZOR_INTEGRATION_BASE_URL: http://localhost:8080
+          DOZOR_INTEGRATION_COMPONENT: ${{ github.event.inputs.known_component }}
+        run: npm run test:integration
+
       - name: Show state snapshot
         id: state_snapshot
         if: always()
@@ -117,6 +142,8 @@ jobs:
             echo "- Trigger failure: $(status_emoji "${{ steps.trigger_failure.outcome }}") \`${{ steps.trigger_failure.outcome }}\`"
             echo "- Wait incident open: $(status_emoji "${{ steps.wait_incident.outcome }}") \`${{ steps.wait_incident.outcome }}\`"
             echo "- Assert incident: $(status_emoji "${{ steps.assert_incident.outcome }}") \`${{ steps.assert_incident.outcome }}\`"
+            echo "- SDK install: $(status_emoji "${{ steps.sdk_install.outcome }}") \`${{ steps.sdk_install.outcome }}\`"
+            echo "- SDK integration tests: $(status_emoji "${{ steps.sdk_integration.outcome }}") \`${{ steps.sdk_integration.outcome }}\`"
             echo "- State snapshot: $(status_emoji "${{ steps.state_snapshot.outcome }}") \`${{ steps.state_snapshot.outcome }}\`"
             echo "- Incidents snapshot: $(status_emoji "${{ steps.incidents_snapshot.outcome }}") \`${{ steps.incidents_snapshot.outcome }}\`"
             echo "- Service logs: $(status_emoji "${{ steps.logs.outcome }}") \`${{ steps.logs.outcome }}\`"

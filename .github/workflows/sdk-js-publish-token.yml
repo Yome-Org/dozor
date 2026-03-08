@@ -1,16 +1,17 @@
-name: SDK JS Publish
+name: SDK JS Publish (Token Fallback)
 
 on:
-  push:
-    tags:
-      - 'sdk-v*'
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: "Expected SDK version from package.json (e.g. 0.1.2)"
+        required: true
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  publish:
+  publish-token:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -34,26 +35,16 @@ jobs:
           npm i -g npm@latest
           echo "version=$(npm --version)" >> "$GITHUB_OUTPUT"
 
-      - name: Resolve release version from tag
-        id: version
-        run: |
-          TAG="${GITHUB_REF_NAME}"
-          VERSION="${TAG#sdk-v}"
-          if [ "$VERSION" = "$TAG" ] || [ -z "$VERSION" ]; then
-            echo "Tag must match sdk-v<version>, got: $TAG" >&2
-            exit 1
-          fi
-          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
-
       - name: Validate package version
         id: validate_version
         run: |
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          TAG_VERSION="${{ steps.version.outputs.value }}"
-          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
-            echo "Version mismatch: package.json=$PACKAGE_VERSION tag=$TAG_VERSION" >&2
+          EXPECTED_VERSION="${{ github.event.inputs.expected_version }}"
+          if [ "$PACKAGE_VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "Version mismatch: package.json=$PACKAGE_VERSION expected=$EXPECTED_VERSION" >&2
             exit 1
           fi
+          echo "value=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
 
       - name: Install
         id: install
@@ -75,9 +66,11 @@ jobs:
         id: build
         run: npm run build
 
-      - name: Publish to npm
+      - name: Publish to npm via token
         id: publish
-        run: npm publish --access public --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
 
       - name: Job summary
         if: always()
@@ -93,32 +86,13 @@ jobs:
             esac
           }
 
-          cov_file="packages/dozor-sdk/coverage/coverage-summary.json"
-          if [ -f "$cov_file" ]; then
-            statements="$(node -e "const c=require('./$cov_file').total.statements; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
-            branches="$(node -e "const c=require('./$cov_file').total.branches; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
-            functions="$(node -e "const c=require('./$cov_file').total.functions; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
-            lines="$(node -e "const c=require('./$cov_file').total.lines; console.log(c.pct+'% ('+c.covered+'/'+c.total+')')")"
-          else
-            statements="n/a"
-            branches="n/a"
-            functions="n/a"
-            lines="n/a"
-          fi
-
           {
-            echo "## SDK JS Publish Summary"
+            echo "## SDK JS Publish (Token Fallback) Summary"
             echo ""
-            echo "### GitHub OIDC Context"
-            echo "- github.repository: \`${GITHUB_REPOSITORY}\`"
-            echo "- github.ref: \`${GITHUB_REF}\`"
-            echo "- github.ref_name: \`${GITHUB_REF_NAME}\`"
-            echo "- github.workflow_ref: \`${GITHUB_WORKFLOW_REF}\`"
-            echo "- github.actor: \`${GITHUB_ACTOR}\`"
+            echo "- Ref: \`${GITHUB_REF_NAME}\`"
+            echo "- Expected version input: \`${{ github.event.inputs.expected_version }}\`"
+            echo "- Resolved package version: \`${{ steps.validate_version.outputs.value }}\`"
             echo "- npm.version: \`${{ steps.npm_upgrade.outputs.version }}\`"
-            echo ""
-            echo "- Tag: \`${GITHUB_REF_NAME}\`"
-            echo "- Release version from tag: \`${{ steps.version.outputs.value }}\`"
             echo "- Version validation: $(status_emoji "${{ steps.validate_version.outcome }}") \`${{ steps.validate_version.outcome }}\`"
             echo "- Install: $(status_emoji "${{ steps.install.outcome }}") \`${{ steps.install.outcome }}\`"
             echo "- Lint/Format: $(status_emoji "${{ steps.check.outcome }}") \`${{ steps.check.outcome }}\`"
@@ -126,10 +100,4 @@ jobs:
             echo "- Tests + Coverage: $(status_emoji "${{ steps.test_coverage.outcome }}") \`${{ steps.test_coverage.outcome }}\`"
             echo "- Build: $(status_emoji "${{ steps.build.outcome }}") \`${{ steps.build.outcome }}\`"
             echo "- Publish: $(status_emoji "${{ steps.publish.outcome }}") \`${{ steps.publish.outcome }}\`"
-            echo ""
-            echo "### Coverage"
-            echo "- Statements: ${statements} (threshold: 90%)"
-            echo "- Branches: ${branches} (threshold: 85%)"
-            echo "- Functions: ${functions} (threshold: 90%)"
-            echo "- Lines: ${lines} (threshold: 90%)"
           } >> "$GITHUB_STEP_SUMMARY"
