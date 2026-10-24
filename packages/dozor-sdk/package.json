@@ -13,9 +13,7 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsup src/index.ts --dts --format esm,cjs --clean",
     "typecheck": "tsc --noEmit",
@@ -25,12 +23,7 @@
     "check:fix": "biome check . --write",
     "test:integration": "vitest run test/integration.test.ts"
   },
-  "keywords": [
-    "dozor",
-    "sdk",
-    "signal",
-    "monitoring"
-  ],
+  "keywords": ["dozor", "sdk", "signal", "monitoring"],
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
