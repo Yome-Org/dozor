@@ -27,8 +27,8 @@ dependencies {
   implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
   testImplementation(kotlin("test"))
-  testImplementation("org.testcontainers:junit-jupiter:1.21.3")
-  testImplementation("org.testcontainers:postgresql:1.21.3")
+  testImplementation("org.testcontainers:junit-jupiter:1.21.4")
+  testImplementation("org.testcontainers:postgresql:1.21.4")
 }
 
 java {
